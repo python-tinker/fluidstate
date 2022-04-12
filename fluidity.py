@@ -1,25 +1,25 @@
-import re
-import inspect
-from fluidity.backwardscompat import callable
-
 # metaclass implementation idea from
-# http://blog.ianbicking.org/more-on-python-metaprogramming-comment-14.html
+# https://ianbicking.org/archive/more-on-python-metaprogramming.html
 _transition_gatherer = []
+
 
 def transition(event, from_, to, action=None, guard=None):
     _transition_gatherer.append([event, from_, to, action, guard])
 
+
 _state_gatherer = []
+
 
 def state(name, enter=None, exit=None):
     _state_gatherer.append([name, enter, exit])
 
 
 class MetaStateMachine(type):
-
     def __new__(cls, name, bases, dictionary):
         global _transition_gatherer, _state_gatherer
-        Machine = super(MetaStateMachine, cls).__new__(cls, name, bases, dictionary)
+        Machine = super(MetaStateMachine, cls).__new__(
+            cls, name, bases, dictionary
+        )
         Machine._class_transitions = []
         Machine._class_states = {}
         for s in _state_gatherer:
@@ -31,11 +31,10 @@ class MetaStateMachine(type):
         return Machine
 
 
-StateMachineBase = MetaStateMachine('StateMachineBase', (object, ), {})
+StateMachineBase = MetaStateMachine('StateMachineBase', (object,), {})
 
 
 class StateMachine(StateMachineBase):
-
     def __init__(self):
         self._bring_definitions_to_object_level()
         self._inject_into_parts()
@@ -73,7 +72,11 @@ class StateMachine(StateMachineBase):
 
     def add_state(self, name, enter=None, exit=None):
         state = _State(name, enter, exit)
-        setattr(self, state.getter_name(), state.getter_method().__get__(self, self.__class__))
+        setattr(
+            self,
+            state.getter_name(),
+            state.getter_method().__get__(self, self.__class__),
+        )
         self._states[name] = state
 
     def _current_state_name(self):
@@ -82,9 +85,7 @@ class StateMachine(StateMachineBase):
     current_state = property(_current_state_name)
 
     def changing_state(self, from_, to):
-        """
-        This method is called whenever a state change is executed
-        """
+        """Call whenever a state change is executed."""
         pass
 
     def _new_state(self, state):
@@ -99,16 +100,30 @@ class StateMachine(StateMachineBase):
 
     @classmethod
     def _add_class_transition(cls, event, from_, to, action, guard):
-        transition = _Transition(event, [cls._class_states[s] for s in _listize(from_)],
-            cls._class_states[to], action, guard)
+        transition = _Transition(
+            event,
+            [cls._class_states[s] for s in _listize(from_)],
+            cls._class_states[to],
+            action,
+            guard,
+        )
         cls._class_transitions.append(transition)
         setattr(cls, event, transition.event_method())
 
     def add_transition(self, event, from_, to, action=None, guard=None):
-        transition = _Transition(event, [self._state_by_name(s) for s in _listize(from_)],
-            self._state_by_name(to), action, guard)
+        transition = _Transition(
+            event,
+            [self._state_by_name(s) for s in _listize(from_)],
+            self._state_by_name(to),
+            action,
+            guard,
+        )
         self._transitions.append(transition)
-        setattr(self, event, transition.event_method().__get__(self, self.__class__))
+        setattr(
+            self,
+            event,
+            transition.event_method().__get__(self, self.__class__),
+        )
 
     def _process_transitions(self, event_name, *args, **kwargs):
         transitions = self._transitions_by_name(event_name)
@@ -118,7 +133,11 @@ class StateMachine(StateMachineBase):
 
     def _create_state_getters(self):
         for state in self._state_objects():
-            setattr(self, state.getter_name(), state.getter_method().__get__(self, self.__class__))
+            setattr(
+                self,
+                state.getter_name(),
+                state.getter_method().__get__(self, self.__class__),
+            )
 
     def _state_by_name(self, name):
         for state in self._state_objects():
@@ -126,15 +145,26 @@ class StateMachine(StateMachineBase):
                 return state
 
     def _transitions_by_name(self, name):
-        return list(filter(lambda transition: transition.event == name, self._transitions))
+        return list(
+            filter(
+                lambda transition: transition.event == name, self._transitions
+            )
+        )
 
     def _ensure_from_validity(self, transitions):
-        valid_transitions = list(filter(
-          lambda transition: transition.is_valid_from(self._current_state_object),
-          transitions))
+        valid_transitions = list(
+            filter(
+                lambda transition: transition.is_valid_from(
+                    self._current_state_object
+                ),
+                transitions,
+            )
+        )
         if len(valid_transitions) == 0:
-            raise InvalidTransition("Cannot %s from %s" % (
-                transitions[0].event, self.current_state))
+            raise InvalidTransition(
+                "Cannot %s from %s"
+                % (transitions[0].event, self.current_state)
+            )
         return valid_transitions
 
     def _check_guards(self, transitions):
@@ -143,14 +173,17 @@ class StateMachine(StateMachineBase):
             if transition.check_guard(self):
                 allowed_transitions.append(transition)
         if len(allowed_transitions) == 0:
-            raise GuardNotSatisfied("Guard is not satisfied for this transition")
+            raise GuardNotSatisfied(
+                "Guard is not satisfied for this transition"
+            )
         elif len(allowed_transitions) > 1:
-            raise ForkedTransition("More than one transition was allowed for this event")
+            raise ForkedTransition(
+                "More than one transition was allowed for this event"
+            )
         return allowed_transitions[0]
 
 
 class _Transition(object):
-
     def __init__(self, event, from_, to, action, guard):
         self.event = event
         self.from_ = from_
@@ -160,7 +193,10 @@ class _Transition(object):
 
     def event_method(self):
         def generated_event(machine, *args, **kwargs):
-            these_transitions = machine._process_transitions(self.event, *args, **kwargs)
+            these_transitions = machine._process_transitions(
+                self.event, *args, **kwargs
+            )
+
         generated_event.__doc__ = 'event %s' % self.event
         generated_event.__name__ = self.event
         return generated_event
@@ -179,7 +215,6 @@ class _Transition(object):
 
 
 class _Guard(object):
-
     def __init__(self, action):
         self.action = action
 
@@ -203,7 +238,6 @@ class _Guard(object):
 
 
 class _State(object):
-
     def __init__(self, name, enter, exit):
         self.name = name
         self.enter = enter
@@ -215,6 +249,7 @@ class _State(object):
     def getter_method(self):
         def state_getter(self_machine):
             return self_machine.current_state == self.name
+
         return state_getter
 
     def run_enter(self, machine):
@@ -225,7 +260,6 @@ class _State(object):
 
 
 class _ActionRunner(object):
-
     def __init__(self, machine):
         self.machine = machine
 
@@ -240,7 +274,9 @@ class _ActionRunner(object):
         if callable(action):
             self._try_to_run_with_args(action, self.machine, *args, **kwargs)
         else:
-            self._try_to_run_with_args(getattr(self.machine, action), *args, **kwargs)
+            self._try_to_run_with_args(
+                getattr(self.machine, action), *args, **kwargs
+            )
 
     def _try_to_run_with_args(self, action, *args, **kwargs):
         try:
@@ -267,4 +303,3 @@ class ForkedTransition(Exception):
 
 def _listize(value):
     return type(value) in [list, tuple] and value or [value]
-

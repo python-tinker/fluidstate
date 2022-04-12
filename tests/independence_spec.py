@@ -27,30 +27,26 @@ class MyMachine(StateMachine):
 
 
 class MachineIndependence(unittest.TestCase):
-
     def test_two_machines_dont_share_transitions(self):
         machine_a = MyMachine()
         machine_b = MyMachine()
 
-        machine_a.current_state |should| equal_to('off')
-        machine_b.current_state |should| equal_to('off')
+        machine_a.current_state | should | equal_to('off')
+        machine_b.current_state | should | equal_to('off')
 
         machine_a.toggle()
 
-        machine_a.current_state |should| equal_to('on')
-        machine_b.current_state |should| equal_to('off')
+        machine_a.current_state | should | equal_to('on')
+        machine_b.current_state | should | equal_to('off')
 
     def test_two_machines_dont_share_actions(self):
         machine_a = MyMachine()
         machine_b = MyMachine()
 
-        machine_a.on_count |should| equal_to(0)
-        machine_b.on_count |should| equal_to(0)
+        machine_a.on_count | should | equal_to(0)
+        machine_b.on_count | should | equal_to(0)
 
         machine_a.toggle()
 
-        machine_a.on_count |should| equal_to(1)
-        machine_b.on_count |should| equal_to(0)
-
-
-
+        machine_a.on_count | should | equal_to(1)
+        machine_b.on_count | should | equal_to(0)

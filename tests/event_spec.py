@@ -19,41 +19,43 @@ class MyMachine(StateMachine):
 
 
 class FluidityEvent(unittest.TestCase):
-
     def test_its_declaration_creates_a_method_with_its_name(self):
         machine = MyMachine()
-        machine |should| respond_to('queue')
-        machine |should| respond_to('process')
+        machine | should | respond_to('queue')
+        machine | should | respond_to('process')
 
     def test_it_changes_machine_state(self):
         machine = MyMachine()
-        machine.current_state |should| equal_to('created')
+        machine.current_state | should | equal_to('created')
         machine.queue()
-        machine.current_state |should| equal_to('waiting')
+        machine.current_state | should | equal_to('waiting')
         machine.process()
-        machine.current_state |should| equal_to('processed')
+        machine.current_state | should | equal_to('processed')
 
     def test_it_ensures_event_order(self):
         machine = MyMachine()
-        machine.process |should| throw(InvalidTransition, message='Cannot process from created')
+        machine.process | should | throw(
+            InvalidTransition, message='Cannot process from created'
+        )
         machine.queue()
-        machine.queue |should| throw(InvalidTransition, message='Cannot queue from waiting')
-        machine.process |should_not| throw(Exception)
+        machine.queue | should | throw(
+            InvalidTransition, message='Cannot queue from waiting'
+        )
+        machine.process | should_not | throw(Exception)
 
     def test_it_accepts_multiple_origin_states(self):
         machine = MyMachine()
-        machine.cancel |should_not| throw(Exception)
+        machine.cancel | should_not | throw(Exception)
 
         machine = MyMachine()
         machine.queue()
-        machine.cancel |should_not| throw(Exception)
+        machine.cancel | should_not | throw(Exception)
 
         machine = MyMachine()
         machine.queue()
         machine.process()
-        machine.cancel |should| throw(Exception)
+        machine.cancel | should | throw(Exception)
 
 
 if __name__ == '__main__':
     unittest.main()
-

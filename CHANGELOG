@@ -22,4 +22,3 @@ Main features for this initial release:
 * definition of states, transitions and events
 * support to entry and exit actions
 * support to guards
-

@@ -9,11 +9,21 @@ class LoanRequest(StateMachine):
     state('refused')
     state('accepted')
     initial_state = 'pending'
-    transition(from_='pending', event='analyze', to='analyzing', action='input_data')
-    transition(from_='analyzing', event='forward_analysis_result',
-               guard='was_loan_accepted', to='accepted')
-    transition(from_='analyzing', event='forward_analysis_result',
-               guard='was_loan_refused', to='refused')
+    transition(
+        from_='pending', event='analyze', to='analyzing', action='input_data'
+    )
+    transition(
+        from_='analyzing',
+        event='forward_analysis_result',
+        guard='was_loan_accepted',
+        to='accepted',
+    )
+    transition(
+        from_='analyzing',
+        event='forward_analysis_result',
+        guard='was_loan_refused',
+        to='refused',
+    )
 
     def input_data(self, accepted=True):
         self.accepted = accepted
@@ -32,22 +42,22 @@ class FluidityEventSupportsMultipleTransitions(unittest.TestCase):
         request = LoanRequest()
         request.analyze()
         request.forward_analysis_result()
-        request.current_state |should| equal_to('accepted')
+        request.current_state | should | equal_to('accepted')
 
         request = LoanRequest()
         request.analyze(accepted=False)
         request.forward_analysis_result()
-        request.current_state |should| equal_to('refused')
+        request.current_state | should | equal_to('refused')
 
     def test_it_raises_error_if_more_than_one_guard_passes(self):
         request = LoanRequest()
         request.analyze()
         request.truify = True
-        request.forward_analysis_result |should| throw(
-            ForkedTransition, message="More than one transition was allowed for this event")
-
+        request.forward_analysis_result | should | throw(
+            ForkedTransition,
+            message="More than one transition was allowed for this event",
+        )
 
 
 if __name__ == '__main__':
     unittest.main()
-

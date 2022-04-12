@@ -20,25 +20,23 @@ class Door(StateMachine):
 
 
 class EventParameters(unittest.TestCase):
-
     def test_it_pass_parameters_received_by_event_to_action(self):
         door = Door()
         door.open('now!', 'there!')
-        door |should| respond_to('when')
-        door.when |should| equal_to('now!')
-        door |should| respond_to('where')
-        door.where |should| equal_to('there!')
+        door | should | respond_to('when')
+        door.when | should | equal_to('now!')
+        door | should | respond_to('where')
+        door.where | should | equal_to('there!')
 
     def test_it_pass_args_and_kwargs_to_action(self):
         door = Door()
         door.open('anytime', 'anywhere')
         door.close('1', 2, object, test=9, it=8, works=7)
-        door |should| respond_to('args')
-        door.args |should| equal_to(('1', 2, object))
-        door |should| respond_to('kwargs')
-        door.kwargs |should| equal_to({'test': 9, 'it': 8, 'works': 7})
+        door | should | respond_to('args')
+        door.args | should | equal_to(('1', 2, object))
+        door | should | respond_to('kwargs')
+        door.kwargs | should | equal_to({'test': 9, 'it': 8, 'works': 7})
 
 
 if __name__ == '__main__':
     unittest.main()
-

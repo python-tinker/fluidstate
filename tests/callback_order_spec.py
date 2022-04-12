@@ -7,8 +7,13 @@ class CrazyGuy(StateMachine):
     state('looking', exit='no_lookin_anymore')
     state('falling', enter='will_fall_right_now')
     initial_state = 'looking'
-    transition(from_='looking', event='jump', to='falling',
-               action='become_at_risk', guard='always_can_jump')
+    transition(
+        from_='looking',
+        event='jump',
+        to='falling',
+        action='become_at_risk',
+        guard='always_can_jump',
+    )
 
     def __init__(self):
         StateMachine.__init__(self)
@@ -31,7 +36,6 @@ class CrazyGuy(StateMachine):
 
 
 class CallbackOrder(unittest.TestCase):
-
     def setUp(self):
         guy = CrazyGuy()
         guy.jump()
@@ -39,21 +43,20 @@ class CallbackOrder(unittest.TestCase):
 
     def test_it_runs_guard_first(self):
         '''(1) guard'''
-        self.callbacks[0] |should| equal_to('guard')
+        self.callbacks[0] | should | equal_to('guard')
 
     def test_it_and_then_old_state_exit(self):
         '''(2) old state exit action'''
-        self.callbacks[1] |should| equal_to('old exit')
+        self.callbacks[1] | should | equal_to('old exit')
 
     def test_it_and_then_new_state_exit(self):
         '''(3) new state enter action'''
-        self.callbacks[2] |should| equal_to('new enter')
+        self.callbacks[2] | should | equal_to('new enter')
 
     def test_it_and_then_transaction_action(self):
         '''(4) transaction action'''
-        self.callbacks[3] |should| equal_to('action')
+        self.callbacks[3] | should | equal_to('action')
 
 
 if __name__ == '__main__':
     unittest.main()
-

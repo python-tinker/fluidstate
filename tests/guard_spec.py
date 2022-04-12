@@ -8,8 +8,12 @@ class FallingMachine(StateMachine):
     state('looking')
     state('falling')
     initial_state = 'looking'
-    transition(from_='looking', event='jump', to='falling',
-               guard=['ready_to_fly', 'high_enough'])
+    transition(
+        from_='looking',
+        event='jump',
+        to='falling',
+        guard=['ready_to_fly', 'high_enough'],
+    )
 
     def __init__(self, ready=True):
         StateMachine.__init__(self)
@@ -24,43 +28,41 @@ class FallingMachine(StateMachine):
 
 
 class FluidityGuard(unittest.TestCase):
-
     def test_it_allows_transition_if_satisfied(self):
         machine = FallingMachine()
-        machine.jump |should_not| throw(Exception)
-        machine.current_state |should| equal_to('falling')
+        machine.jump | should_not | throw(Exception)
+        machine.current_state | should | equal_to('falling')
 
     def test_it_forbids_transition_if_not_satisfied(self):
         machine = FallingMachine(ready=False)
-        machine.jump |should| throw(GuardNotSatisfied)
+        machine.jump | should | throw(GuardNotSatisfied)
 
     def test_it_may_be_an_attribute(self):
         '''it may be an attribute, not only a method'''
         machine = FallingMachine()
         machine.ready_to_fly = False
-        machine.jump |should| throw(GuardNotSatisfied)
+        machine.jump | should | throw(GuardNotSatisfied)
 
         machine.ready_to_fly = True
-        machine.jump |should_not| throw(Exception)
-        machine.current_state |should| equal_to('falling')
+        machine.jump | should_not | throw(Exception)
+        machine.current_state | should | equal_to('falling')
 
     def test_it_allows_transition_only_if_all_are_satisfied(self):
         machine = FallingMachine()
         machine.ready_to_fly = True
         machine.high_enough_flag = True
-        machine.jump |should_not| throw(Exception)
+        machine.jump | should_not | throw(Exception)
 
         machine = FallingMachine()
         machine.ready_to_fly = False
         machine.high_enough_flag = True
-        machine.jump |should| throw(GuardNotSatisfied)
+        machine.jump | should | throw(GuardNotSatisfied)
 
         machine = FallingMachine()
         machine.ready_to_fly = True
         machine.high_enough_flag = False
-        machine.jump |should| throw(GuardNotSatisfied)
+        machine.jump | should | throw(GuardNotSatisfied)
 
 
 if __name__ == '__main__':
     unittest.main()
-
