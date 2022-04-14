@@ -20,27 +20,26 @@ A very simple example taken from specs::
          state('processed')
          state('canceled')
 
-         transition(from_='created', event='queue', to='waiting')
-         transition(from_='waiting', event='process', to='processed')
-         transition(from_=['waiting', 'created'], event='cancel', to='canceled')
+         transition(source='created', event='queue', target='waiting')
+         transition(source='waiting', event='process', target='processed')
+         transition(source=['waiting', 'created'], event='cancel', target='canceled')
 
 
 "A slightly more complex example"
 ---------------------------------
 
-For demonstrating more advanced capabilities, a "slightly more complex example" from `AASM <https://github.com/rubyist/aasm>`_, the Ruby's most popular state machine implementation, is reproduced below, using Fluidity::
-
+For demonstrating more advanced capabilities::
 
     from fluidity import StateMachine, state, transition
 
     class Relationship(StateMachine):
         initial_state = lambda relationship: relationship.strictly_for_fun() and 'intimate' or 'dating'
-        state('dating', enter='make_happy', exit='make_depressed')
-        state('intimate', enter='make_very_happy', exit='never_speak_again')
-        state('married', enter='give_up_intimacy', exit='buy_exotic_car_and_buy_a_combover')
+        state('dating', start='make_happy', finish='make_depressed')
+        state('intimate', start='make_very_happy', finish='never_speak_again')
+        state('married', start='give_up_intimacy', finish='buy_exotic_car_and_buy_a_combover')
 
-        transition(from_='dating', event='get_intimate', to='intimate', guard='drunk')
-        transition(from_=['dating', 'intimate'], event='get_married', to='married', guard='willing_to_give_up_manhood')
+        transition(source='dating', event='get_intimate', target='intimate', guard='drunk')
+        transition(source=['dating', 'intimate'], event='get_married', target='married', guard='willing_to_give_up_manhood')
 
         def strictly_for_fun(self): pass
         def drunk(self): pass
@@ -56,10 +55,10 @@ For demonstrating more advanced capabilities, a "slightly more complex example" 
 States
 ------
 
-A Fluidity state machine must have one initial state and at least two states.
+A Fluidity state machine must have one initial state and at least two additional states.
 
-A state may have enter and exit callbacks, for running some code on state enter
-and exit, respectively. These params can be method names (as strings),
+A state may have start and finish callbacks, for running some code on state start
+and finish, respectively. These params can be method names (as strings),
 callables, or lists of method names or callables.
 
 
@@ -67,7 +66,7 @@ Transitions
 -----------
 
 Transitions lead the machine from a state to another. Transitions must have
-*from\_*, *to*, and *action* parameters. *from\_* is one or more (as list) states
+*start*, *finish*, and *action* parameters. *from\_* is one or more (as list) states
 from which the transition can be started. *to* is the state to which the
 transition will lead the machine. *event* is the method that have to be called
 to launch the transition. This method is automatically created by the Fluidity
@@ -93,7 +92,7 @@ states and transitions for individual objects. For example, having "door" as a
 state machine::
 
     door.add_state('broken')
-    door.add_transition(from_='closed', event='crack', to='broken')
+    door.add_transition(event='crack', source='closed', target='broken')
 
 
 These additions only affect the target object.
@@ -104,10 +103,7 @@ How to install
 
 Just run::
 
-    pip install fluidity-sm
-
-
-**Note**: the Pypi package is called *fluidity-sm*, not *fluidity*.
+    pip install fluidity
 
 
 How to run tests
@@ -115,9 +111,4 @@ How to run tests
 
 Just run::
 
-    make test
-
-for install all test dependencies (`Should-DSL <http://www.should-dsl.info>`_
-and `Specloud <https://github.com/hugobr/specloud>`_, at the moment) and
-run the tests. Fluidity itself has no dependencies.
-
+    tox

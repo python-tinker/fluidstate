@@ -7,8 +7,8 @@ class MyMachine(StateMachine):
 
     initial_state = 'off'
 
-    state('off', entry='inc_off')
-    state('on', entry='inc_on')
+    state('off', start='inc_off')
+    state('on', start='inc_on')
 
     transition(source='off', event='toggle', target='on')
     transition(source='on', event='toggle', target='off')

@@ -7,23 +7,23 @@ footsteps = []
 
 class Foo:
     def bar(self):
-        footsteps.append('exit looking')
+        footsteps.append('finish looking')
 
 
 foo = Foo()
 
 
-def entry_falling_function():
-    footsteps.append('entry falling')
+def start_falling_function():
+    footsteps.append('start falling')
 
 
 class JumperGuy(StateMachine):
     state(
         'looking',
-        entry=lambda jumper: jumper.append('entry looking'),
-        exit=foo.bar,
+        start=lambda jumper: jumper.append('start looking'),
+        finish=foo.bar,
     )
-    state('falling', entry=entry_falling_function)
+    state('falling', start=start_falling_function)
     initial_state = 'looking'
 
     transition(
@@ -43,15 +43,15 @@ class JumperGuy(StateMachine):
 
 class CallableSupport(unittest.TestCase):
     def test_every_callback_can_be_a_callable(self):
-        '''every callback can be a callable'''
+        """every callback can be a callable"""
         guy = JumperGuy()
         guy.jump()
         assert len(footsteps) == 5
         assert sorted(footsteps) == sorted(
             [
-                'entry looking',
-                'exit looking',
-                'entry falling',
+                'start looking',
+                'finish looking',
+                'start falling',
                 'action jump',
                 'guard jump',
             ]

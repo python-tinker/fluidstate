@@ -27,8 +27,8 @@ class IndividuationSpec(unittest.TestCase):
         assert self.door.current_state == 'broken'
 
     def test_it_informs_all_its_states(self):
-        assert len(self.door.states()) == 3
-        assert self.door.states() == ['closed', 'open', 'broken']
+        assert len(self.door.states) == 3
+        assert self.door.states == ['closed', 'open', 'broken']
 
     def test_its_individuation_does_not_affect_other_objects_sourcethe_same_class(
         self,

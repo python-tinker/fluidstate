@@ -13,8 +13,8 @@ class FluidityState(unittest.TestCase):
             initial_state = 'read'
 
         machine = MyMachine()
-        assert len(machine.states()) == 3
-        assert machine.states() == ['unread', 'read', 'closed']
+        assert len(machine.states) == 3
+        assert machine.states == ['unread', 'read', 'closed']
 
     def test_it_has_an_initial_state(self):
         class MyMachine(StateMachine):
@@ -36,8 +36,8 @@ class FluidityState(unittest.TestCase):
             transition(source='read', event='close', target='closed')
 
         machine = MyMachine()
-        assert len(machine.states()) == 3
-        assert machine.states() == ['unread', 'read', 'closed']
+        assert len(machine.states) == 3
+        assert machine.states == ['unread', 'read', 'closed']
 
         class OtherMachine(StateMachine):
             state('idle')
@@ -46,8 +46,8 @@ class FluidityState(unittest.TestCase):
             transition(source='idle', event='work', target='working')
 
         machine = OtherMachine()
-        assert len(machine.states()) == 2
-        assert machine.states() == ['idle', 'working']
+        assert len(machine.states) == 2
+        assert machine.states == ['idle', 'working']
 
     def test_its_initial_state_may_be_a_callable(self):
         def is_business_hours():
