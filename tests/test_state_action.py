@@ -1,5 +1,4 @@
 import unittest
-from should_dsl import should, should_not
 from fluidity import StateMachine, state, transition
 
 
@@ -7,17 +6,17 @@ class ActionMachine(StateMachine):
 
     state(
         'created',
-        enter='about_to_create',
+        entry='about_to_create',
         exit=['other_post_create', 'post_create'],
     )
-    state('waiting', enter=['pre_wait', 'other_pre_wait'])
+    state('waiting', entry=['pre_wait', 'other_pre_wait'])
     initial_state = 'created'
-    transition(from_='created', event='queue', to='waiting')
+    transition(source='created', event='queue', target='waiting')
 
     def __init__(self):
-        self.enter_create = False
+        self.entry_create = False
         super(ActionMachine, self).__init__()
-        self.is_enter_aware = False
+        self.is_entry_aware = False
         self.is_exit_aware = False
         self.pre_wait_aware = False
         self.other_pre_wait_aware = False
@@ -26,7 +25,7 @@ class ActionMachine(StateMachine):
         self.count = 0
 
     def pre_wait(self):
-        self.is_enter_aware = True
+        self.is_entry_aware = True
         self.pre_wait_aware = True
         if getattr(self, 'pre_wait_expectation', None):
             self.pre_wait_expectation()
@@ -38,7 +37,7 @@ class ActionMachine(StateMachine):
             self.post_create_expectation()
 
     def about_to_create(self):
-        self.enter_create = True
+        self.entry_create = True
 
     def other_pre_wait(self):
         self.other_pre_wait_aware = True
@@ -48,29 +47,29 @@ class ActionMachine(StateMachine):
 
 
 class FluidityAction(unittest.TestCase):
-    def test_it_runs_enter_action_before_machine_enters_a_given_state(self):
+    def test_it_runs_entry_action_before_machine_entrys_a_given_state(self):
         machine = ActionMachine()
-        machine | should_not | be_enter_aware
+        assert machine.is_entry_aware is False
         machine.queue()
-        machine | should | be_enter_aware
+        assert machine.is_entry_aware is True
 
     def test_it_runs_exit_action_after_machine_exits_a_given_state(self):
         machine = ActionMachine()
-        machine | should_not | be_exit_aware
+        assert machine.is_exit_aware is False
         machine.queue()
-        machine | should | be_enter_aware
+        assert machine.is_entry_aware is True
 
-    def test_it_runs_exit_action_before_enter_action(self):
-        '''it runs old state's exit action before new state's enter action'''
+    def test_it_runs_exit_action_before_entry_action(self):
+        '''it runs old state's exit action before new state's entry action'''
         machine = ActionMachine()
 
         def post_create_expectation(_self):
             _self.count += 1
-            _self.count | should | equal_to(1)
+            assert _self.count == 1
 
         def pre_wait_expectation(_self):
             _self.count += 1
-            _self.count | should | equal_to(2)
+            assert _self.count == 2
 
         machine.post_create_expectation = post_create_expectation.__get__(
             machine, ActionMachine
@@ -80,24 +79,25 @@ class FluidityAction(unittest.TestCase):
         )
         machine.queue()
 
-    def test_it_runs_enter_action_for_initial_state_at_creation(self):
-        ActionMachine().enter_create | should | be(True)
+    def test_it_runs_entry_action_for_initial_state_at_creation(self):
+        assert ActionMachine().entry_create is True
 
-    def test_it_accepts_many_enter_actions(self):
+    def test_it_accepts_many_entry_actions(self):
         machine = ActionMachine()
-        machine | should_not | be_pre_wait_aware
-        machine | should_not | be_other_pre_wait_aware
+        assert machine.pre_wait_aware is False
+        assert machine.other_pre_wait_aware is False
         machine.queue()
-        machine | should | be_pre_wait_aware
-        machine | should | be_other_pre_wait_aware
+        assert machine.pre_wait_aware is True
+        assert machine.other_pre_wait_aware is True
 
     def test_it_accepts_exit_actions(self):
         machine = ActionMachine()
-        machine | should_not | be_post_create_aware
-        machine | should_not | be_other_post_create_aware
+        assert machine.post_create_aware is False
+        assert machine.other_post_create_aware is False
+
         machine.queue()
-        machine | should | be_post_create_aware
-        machine | should | be_other_post_create_aware
+        assert machine.post_create_aware is True
+        assert machine.other_post_create_aware is True
 
 
 if __name__ == '__main__':

@@ -1,5 +1,4 @@
 import unittest
-from should_dsl import should, should_not
 from fluidity import StateMachine, state, transition
 
 
@@ -8,9 +7,9 @@ class CrazyGuy(StateMachine):
     state('falling')
     initial_state = 'looking'
     transition(
-        from_='looking',
+        source='looking',
         event='jump',
-        to='falling',
+        target='falling',
         action=['become_at_risk', 'accelerate'],
     )
 
@@ -29,17 +28,19 @@ class CrazyGuy(StateMachine):
 class FluidityTransitionAction(unittest.TestCase):
     def test_it_runs_when_transition_occurs(self):
         guy = CrazyGuy()
-        guy | should_not | be_at_risk
+        assert guy.at_risk is False
+
         guy.jump()
-        guy | should | be_at_risk
+        assert guy.at_risk is True
 
     def test_it_supports_multiple_transition_actions(self):
         guy = CrazyGuy()
-        guy | should_not | be_at_risk
-        guy | should_not | be_accelerating
+        assert guy.at_risk is False
+        assert guy.accelerating is False
+
         guy.jump()
-        guy | should | be_at_risk
-        guy | should | be_accelerating
+        assert guy.at_risk is True
+        assert guy.accelerating is True
 
 
 if __name__ == '__main__':

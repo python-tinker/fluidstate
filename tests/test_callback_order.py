@@ -1,16 +1,15 @@
 import unittest
-from should_dsl import should
 from fluidity import StateMachine, state, transition
 
 
 class CrazyGuy(StateMachine):
     state('looking', exit='no_lookin_anymore')
-    state('falling', enter='will_fall_right_now')
+    state('falling', entry='will_fall_right_now')
     initial_state = 'looking'
     transition(
-        from_='looking',
+        source='looking',
         event='jump',
-        to='falling',
+        target='falling',
         action='become_at_risk',
         guard='always_can_jump',
     )
@@ -28,7 +27,7 @@ class CrazyGuy(StateMachine):
         self.callbacks.append('old exit')
 
     def will_fall_right_now(self):
-        self.callbacks.append('new enter')
+        self.callbacks.append('new entry')
 
     def always_can_jump(self):
         self.callbacks.append('guard')
@@ -42,20 +41,20 @@ class CallbackOrder(unittest.TestCase):
         self.callbacks = guy.callbacks
 
     def test_it_runs_guard_first(self):
-        '''(1) guard'''
-        self.callbacks[0] | should | equal_to('guard')
+        """(1) guard"""
+        self.callbacks[0] == 'guard'
 
     def test_it_and_then_old_state_exit(self):
-        '''(2) old state exit action'''
-        self.callbacks[1] | should | equal_to('old exit')
+        """(2) old state exit action"""
+        self.callbacks[1] == 'old exit'
 
     def test_it_and_then_new_state_exit(self):
-        '''(3) new state enter action'''
-        self.callbacks[2] | should | equal_to('new enter')
+        """(3) new state entry action"""
+        self.callbacks[2] == 'new entry'
 
     def test_it_and_then_transaction_action(self):
-        '''(4) transaction action'''
-        self.callbacks[3] | should | equal_to('action')
+        """(4) transaction action"""
+        self.callbacks[3] == 'action'
 
 
 if __name__ == '__main__':

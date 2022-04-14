@@ -1,5 +1,4 @@
 import unittest
-from should_dsl import should, should_not
 from fluidity import StateMachine, state, transition
 from fluidity import InvalidTransition
 
@@ -8,11 +7,11 @@ class MyMachine(StateMachine):
 
     initial_state = 'off'
 
-    state('off', enter='inc_off')
-    state('on', enter='inc_on')
+    state('off', entry='inc_off')
+    state('on', entry='inc_on')
 
-    transition(from_='off', event='toggle', to='on')
-    transition(from_='on', event='toggle', to='off')
+    transition(source='off', event='toggle', target='on')
+    transition(source='on', event='toggle', target='off')
 
     def __init__(self):
         self.off_count = 0
@@ -31,22 +30,22 @@ class MachineIndependence(unittest.TestCase):
         machine_a = MyMachine()
         machine_b = MyMachine()
 
-        machine_a.current_state | should | equal_to('off')
-        machine_b.current_state | should | equal_to('off')
+        assert machine_a.current_state == 'off'
+        assert machine_b.current_state == 'off'
 
         machine_a.toggle()
 
-        machine_a.current_state | should | equal_to('on')
-        machine_b.current_state | should | equal_to('off')
+        assert machine_a.current_state == 'on'
+        assert machine_b.current_state == 'off'
 
     def test_two_machines_dont_share_actions(self):
         machine_a = MyMachine()
         machine_b = MyMachine()
 
-        machine_a.on_count | should | equal_to(0)
-        machine_b.on_count | should | equal_to(0)
+        machine_a.on_count == 0
+        machine_b.on_count == 0
 
         machine_a.toggle()
 
-        machine_a.on_count | should | equal_to(1)
-        machine_b.on_count | should | equal_to(0)
+        machine_a.on_count == 1
+        machine_b.on_count == 0

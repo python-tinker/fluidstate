@@ -1,5 +1,4 @@
 import unittest
-from should_dsl import should
 from fluidity import StateMachine, state, transition
 from fluidity import GuardNotSatisfied
 
@@ -14,23 +13,23 @@ class Foo:
 foo = Foo()
 
 
-def enter_falling_function():
-    footsteps.append('enter falling')
+def entry_falling_function():
+    footsteps.append('entry falling')
 
 
 class JumperGuy(StateMachine):
     state(
         'looking',
-        enter=lambda jumper: jumper.append('enter looking'),
+        entry=lambda jumper: jumper.append('entry looking'),
         exit=foo.bar,
     )
-    state('falling', enter=enter_falling_function)
+    state('falling', entry=entry_falling_function)
     initial_state = 'looking'
 
     transition(
-        from_='looking',
+        source='looking',
         event='jump',
-        to='falling',
+        target='falling',
         action=lambda jumper: jumper.append('action jump'),
         guard=lambda jumper: jumper.append('guard jump') is None,
     )
@@ -47,12 +46,12 @@ class CallableSupport(unittest.TestCase):
         '''every callback can be a callable'''
         guy = JumperGuy()
         guy.jump()
-        footsteps | should | have(5).elements
-        footsteps | should | include_all_of(
+        assert len(footsteps) == 5
+        assert sorted(footsteps) == sorted(
             [
-                'enter looking',
+                'entry looking',
                 'exit looking',
-                'enter falling',
+                'entry falling',
                 'action jump',
                 'guard jump',
             ]
@@ -64,9 +63,9 @@ class CallableSupport(unittest.TestCase):
             state('closed')
             initial_state = 'closed'
             transition(
-                from_='closed',
+                source='closed',
                 event='open',
-                to='open',
+                target='open',
                 guard=lambda d: not door.locked,
             )
 
@@ -75,7 +74,8 @@ class CallableSupport(unittest.TestCase):
 
         door = Door()
         door.locked = True
-        door.open | should | throw(GuardNotSatisfied)
+        with self.assertRaises(GuardNotSatisfied):
+            door.open()
 
 
 if __name__ == '__main__':

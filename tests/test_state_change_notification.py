@@ -1,5 +1,4 @@
 import unittest
-from should_dsl import should
 from fluidity import StateMachine, state, transition
 
 
@@ -10,16 +9,16 @@ class Door(StateMachine):
     state('broken')
     initial_state = 'closed'
 
-    transition(from_='closed', event='open', to='open')
-    transition(from_='open', event='close', to='closed')
-    transition(from_='closed', event='crack', to='broken')
+    transition(source='closed', event='open', target='open')
+    transition(source='open', event='close', target='closed')
+    transition(source='closed', event='crack', target='broken')
 
     def __init__(self):
         self.state_changes = []
         super(Door, self).__init__()
 
-    def changing_state(self, from_, to):
-        self.state_changes.append((from_, to))
+    def changing_state(self, source, target):
+        self.state_changes.append((source, target))
 
 
 class StateChangeNotificationSpec(unittest.TestCase):
@@ -28,7 +27,8 @@ class StateChangeNotificationSpec(unittest.TestCase):
         door.open()
         door.close()
         door.crack()
-
-        door.state_changes | should | equal_to(
-            [('closed', 'open'), ('open', 'closed'), ('closed', 'broken')]
-        )
+        door.state_changes == [
+            ('closed', 'open'),
+            ('open', 'closed'),
+            ('closed', 'broken'),
+        ]
