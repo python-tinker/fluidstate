@@ -83,10 +83,10 @@ class MetaStateMachine(type):
         cls,
         name: str,
         bases: Tuple[type, ...],
-        dictionary: Dict[str, Any],
+        attrs: Dict[str, Any],
     ) -> 'MetaStateMachine':
         global _transition_gatherer, _state_gatherer
-        Machine = super().__new__(cls, name, bases, dictionary)
+        Machine = super().__new__(cls, name, bases, attrs)
         Machine._class_transitions = []  # type: ignore
         Machine._class_states = {}  # type: ignore
 
