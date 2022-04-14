@@ -27,8 +27,8 @@ python = "^3.6.2"
 
 [tool.poetry.dev-dependencies]
 tox = "^3.25.0"
-should_dsl = "^2.1.2"
 black = "^22.3.0"
+mypy = "^0.942"
 
 [tool.isort]
 profile = "black"
