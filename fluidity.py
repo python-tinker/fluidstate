@@ -26,18 +26,18 @@ https://ianbicking.org/archive/more-on-python-metaprogramming.html
 
 """
 import logging
-from typing import Any, Callable, Dict, List, Tuple, Optional, Union
+from typing import Any, Callable, Dict, Iterable, List, Tuple, Optional, Union
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 EventTrigger = Union[str, Callable]
-EventTriggers = Union[EventTrigger, List[EventTrigger]]
+EventTriggers = Union[EventTrigger, Iterable[EventTrigger]]
 TransitionSource = EventTrigger
-TransitionSources = Union[TransitionSource, List[TransitionSource]]
+TransitionSources = Union[TransitionSource, Iterable[TransitionSource]]
 
 
-def _listize(value):
-    return type(value) in [list, tuple] and value or [value]
+def _tuplize(value: Any) -> Tuple[Any, ...]:
+    return tuple(value) if type(value) in [list, tuple] else (value,)
 
 
 _transition_gatherer = []
@@ -48,7 +48,7 @@ def transition(
     source: TransitionSources,
     target: str,
     action: Optional[EventTriggers] = None,
-    guard: Optional[EventTrigger] = None,
+    guard: Optional[EventTriggers] = None,
 ) -> None:
     # print(
     #     'transition',
@@ -102,7 +102,7 @@ class MetaStateMachine(type):
         return Machine
 
 
-StateMachineBase = MetaStateMachine('StateMachineBase', (object,), {})
+StateMachineBase = MetaStateMachine('StateMachineBase', (), {})
 
 
 class StateMachine(StateMachineBase):  # type: ignore
@@ -204,7 +204,7 @@ class StateMachine(StateMachineBase):  # type: ignore
         """
         transition = Transition(
             event,
-            [cls._class_states[s] for s in _listize(source)],
+            [cls._class_states[s] for s in _tuplize(source)],
             cls._class_states[target],
             action,
             guard,
@@ -222,7 +222,7 @@ class StateMachine(StateMachineBase):  # type: ignore
     ) -> None:
         transition = Transition(
             event,
-            [self._state_by_name(s) for s in _listize(source)],
+            [self._state_by_name(s) for s in _tuplize(source)],
             self._state_by_name(target),
             action,
             guard,
@@ -326,7 +326,7 @@ class Transition:
         return generated_event
 
     def is_valid_from(self, source: 'State') -> bool:
-        return source in _listize(self.source)
+        return source in _tuplize(self.source)
 
     def check_guard(self, machine: 'StateMachine') -> bool:
         return self.guard.check(machine)
@@ -380,7 +380,7 @@ class ActionRunner:
     ) -> None:
         if not action_param:
             return
-        action_items = _listize(action_param)
+        action_items = _tuplize(action_param)
         for action_item in action_items:
             self._run_action(action_item, *args, **kwargs)
 
@@ -410,7 +410,7 @@ class Guard:
     def check(self, machine: 'StateMachine') -> bool:
         if self.guard is None:
             return True
-        items = _listize(self.guard)
+        items = _tuplize(self.guard)
         result = True
         for item in items:
             result = result and self._evaluate(machine, item)
