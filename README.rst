@@ -66,8 +66,8 @@ Transitions
 -----------
 
 Transitions lead the machine from a state to another. Transitions must have
-*start*, *finish*, and *action* parameters. *from\_* is one or more (as list) states
-from which the transition can be started. *to* is the state to which the
+*source*, *target*, and *event* parameters. *source* is one or more (as list) states
+from which the transition can be started. *target* is the state to which the
 transition will lead the machine. *event* is the method that have to be called
 to launch the transition. This method is automatically created by the Fluidity
 engine.
