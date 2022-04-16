@@ -1,5 +1,4 @@
 import unittest
-import time
 
 from fluidity import StateMachine, transition, state
 

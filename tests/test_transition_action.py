@@ -11,7 +11,7 @@ class CrazyGuy(StateMachine):
         source='looking',
         event='jump',
         target='falling',
-        action=['become_at_risk', 'accelerate'],
+        trigger=['become_at_risk', 'accelerate'],
     )
 
     def __init__(self):
@@ -34,7 +34,7 @@ class FluidityTransitionAction(unittest.TestCase):
         guy.jump()
         assert guy.at_risk is True
 
-    def test_it_supports_multiple_transition_actions(self):
+    def test_it_supports_multiple_transition_triggers(self):
         guy = CrazyGuy()
         assert guy.at_risk is False
         assert guy.accelerating is False

@@ -12,18 +12,18 @@ class LoanRequest(StateMachine):
         source='pending',
         event='analyze',
         target='analyzing',
-        action='input_data',
+        trigger='input_data',
     )
     transition(
         source='analyzing',
         event='forward_analysis_result',
-        guard='was_loan_accepted',
+        need='was_loan_accepted',
         target='accepted',
     )
     transition(
         source='analyzing',
         event='forward_analysis_result',
-        guard='was_loan_refused',
+        need='was_loan_refused',
         target='refused',
     )
 
@@ -38,9 +38,9 @@ class LoanRequest(StateMachine):
 
 
 class FluidityEventSupportsMultipleTransitions(unittest.TestCase):
-    '''Event chooses one of multiple transitions, based in their guards'''
+    """Event chooses one of multiple transitions, based in their needs"""
 
-    def test_it_selects_the_transition_having_a_passing_guard(self):
+    def test_it_selects_the_transition_having_a_passing_need(self):
         request = LoanRequest()
         request.analyze()
         request.forward_analysis_result()
@@ -51,7 +51,7 @@ class FluidityEventSupportsMultipleTransitions(unittest.TestCase):
         request.forward_analysis_result()
         request.current_state == 'refused'
 
-    def test_it_raises_error_if_more_than_one_guard_passes(self):
+    def test_it_raises_error_if_more_than_one_need_passes(self):
         request = LoanRequest()
         request.analyze()
         request.truify = True

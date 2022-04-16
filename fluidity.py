@@ -20,12 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-"""Simple state machine that can be vendored.
-
-metaclass implementation idea from
-https://ianbicking.org/archive/more-on-python-metaprogramming.html
-
-"""
+"""Compact state machine that can be vendored."""
 
 import logging
 from typing import (
@@ -34,7 +29,6 @@ from typing import (
     Dict,
     Iterable,
     List,
-    NewType,
     Optional,
     Tuple,
     Union,
@@ -45,7 +39,7 @@ log.addHandler(logging.NullHandler())
 
 EventTrigger = Union[str, Callable]
 EventTriggers = Union[EventTrigger, Iterable[EventTrigger]]
-StateType = NewType('StateType', str)
+StateType = str
 StateTypes = Union[StateType, Iterable[StateType]]
 
 
@@ -60,13 +54,13 @@ def transition(
     event: str,
     source: StateTypes,
     target: StateType,
-    action: Optional[EventTriggers] = None,
-    guard: Optional[EventTriggers] = None,
+    trigger: Optional[EventTriggers] = None,
+    need: Optional[EventTriggers] = None,
 ) -> None:
     log.info(
-        f"recieved transition: {event}, {source}, {target}, {action}, {guard}"
+        f"recieved transition: {event}, {source}, {target}, {trigger}, {need}"
     )
-    _transition_gatherer.append([event, source, target, action, guard])
+    _transition_gatherer.append([event, source, target, trigger, need])
 
 
 _state_gatherer = []
@@ -74,14 +68,17 @@ _state_gatherer = []
 
 def state(
     name: str,
-    start: Optional[EventTriggers] = None,
-    finish: Optional[EventTriggers] = None,
+    before: Optional[EventTriggers] = None,
+    after: Optional[EventTriggers] = None,
 ) -> None:
-    log.info(f"recieved state: {name}, {start}, {start}")
-    _state_gatherer.append([name, start, finish])
+    log.info(f"recieved state: {name}, {before}, {before}")
+    _state_gatherer.append([name, before, after])
 
 
 class MetaStateMachine(type):
+    _class_states: Dict[str, Any]
+    _class_transitions: List['Transition']
+
     def __new__(
         cls,
         name: str,
@@ -89,51 +86,40 @@ class MetaStateMachine(type):
         attrs: Dict[str, Any],
     ) -> 'MetaStateMachine':
         global _transition_gatherer, _state_gatherer
-        Machine = super(MetaStateMachine, cls).__new__(cls, name, bases, attrs)
-        Machine._class_transitions = []  # type: ignore
-        Machine._class_states = {}  # type: ignore
-
-        # for k, v in attrs.items():
-        #     print(k, v)
+        obj = super(MetaStateMachine, cls).__new__(cls, name, bases, attrs)
+        obj._class_transitions = []
+        obj._class_states = {}
 
         for s in _state_gatherer:
-            Machine._class_states[s[0]] = State(str(s[0]), s[1], s[2])
+            obj._class_states[str(s[0])] = State(str(s[0]), s[1], s[2])
 
         for t in _transition_gatherer:
             transition = Transition(
                 event=str(t[0]),
-                source=[Machine._class_states[s] for s in _tuplize(t[1])],
-                target=Machine._class_states[t[2]],
-                action=t[3],
-                guard=t[4],
+                source=[obj._class_states[s] for s in _tuplize(t[1])],
+                target=obj._class_states[str(t[2])],
+                trigger=t[3],  # type: ignore
+                need=t[4],  # type: ignore
             )
-            Machine._class_transitions.append(transition)
-            setattr(Machine, str(t[0]), transition.event_method())
+            obj._class_transitions.append(transition)
+            setattr(obj, str(t[0]), transition.event_method())
 
         _transition_gatherer = []
         _state_gatherer = []
 
-        return Machine
-
-    # def __init__(
-    #     cls,
-    #     name: str,
-    #     bases: Tuple[type, ...],
-    #     attrs: Dict[str, Any],
-    # ) -> None:
-    #     super(MetaStateMachine, cls).__init__(name, bases, attrs)
-    #     if 'initial_state' in attrs:
-    #         if callable(attrs['initial_state']):
-    #             cls.initial_state = attrs['initial_state']()
-    #         else:
-    #             cls.initial_state = attrs['initial_state']
+        return obj
 
 
-StateMachineBase = MetaStateMachine('StateMachineBase', (), {})
-
-
-class StateMachine(StateMachineBase):  # type: ignore
+class StateMachine(metaclass=MetaStateMachine):
     initial_state: str
+    _states: Dict[str, Any]
+    _transitions: List[Any]
+
+    def __new__(cls, *args: Any, **kwargs: Any) -> 'StateMachine':
+        obj = super(StateMachine, cls).__new__(cls)
+        obj._states = {}
+        obj._transitions = []
+        return obj
 
     def __init__(self) -> None:
         self._bring_definitions_to_object_level()
@@ -142,14 +128,8 @@ class StateMachine(StateMachineBase):  # type: ignore
         if callable(self.initial_state):
             self.initial_state = self.initial_state()
         self._current_state_object = self._state_by_name(self.initial_state)
-        self._current_state_object.run_start(self)
+        self._current_state_object.run_before(self)
         self._create_state_callbacks()
-
-    def __new__(cls, *args: Any, **kwargs: Any) -> 'StateMachine':
-        obj = super(StateMachine, cls).__new__(cls)
-        obj._states = {}
-        obj._transitions = []
-        return obj
 
     def _bring_definitions_to_object_level(self) -> None:
         self._states.update(self.__class__._class_states)
@@ -169,10 +149,10 @@ class StateMachine(StateMachineBase):  # type: ignore
     def add_state(
         self,
         name: str,
-        start: Optional[EventTriggers] = None,
-        finish: Optional[EventTriggers] = None,
+        before: Optional[EventTriggers] = None,
+        after: Optional[EventTriggers] = None,
     ) -> None:
-        state = State(name, start, finish)
+        state = State(name, before, after)
         setattr(
             self,
             f"is_{state.name}",
@@ -204,15 +184,15 @@ class StateMachine(StateMachineBase):  # type: ignore
         event: str,
         source: StateTypes,
         target: StateType,
-        action: Optional[str] = None,
-        guard: Optional[str] = None,
+        trigger: Optional[str] = None,
+        need: Optional[str] = None,
     ) -> None:
         transition = Transition(
             event,
             [self._state_by_name(s) for s in _tuplize(source)],
             self._state_by_name(target),
-            action,
-            guard,
+            trigger,
+            need,
         )
         self._transitions.append(transition)
         setattr(
@@ -226,7 +206,7 @@ class StateMachine(StateMachineBase):  # type: ignore
     ) -> None:
         transitions = self._transitions_by_name(event_name)
         transitions = self._ensure_source_validity(transitions)
-        this_transition = self._check_guards(transitions)
+        this_transition = self._check_needs(transitions)
         this_transition.run(self, *args, **kwargs)
 
     def _create_state_callbacks(self) -> None:
@@ -267,15 +247,13 @@ class StateMachine(StateMachineBase):  # type: ignore
             )
         return valid_transitions
 
-    def _check_guards(self, transitions: List['Transition']) -> 'Transition':
+    def _check_needs(self, transitions: List['Transition']) -> 'Transition':
         allowed_transitions = []
         for transition in transitions:
-            if transition.check_guard(self):
+            if transition.check_need(self):
                 allowed_transitions.append(transition)
         if len(allowed_transitions) == 0:
-            raise GuardNotSatisfied(
-                "Guard is not satisfied for this transition"
-            )
+            raise NeedNotSatisfied("Need is not satisfied for this transition")
         elif len(allowed_transitions) > 1:
             raise ForkedTransition(
                 "More than one transition was allowed for this event"
@@ -289,14 +267,14 @@ class Transition:
         event: str,
         source: Union['State', List['State']],
         target: 'State',
-        action: Optional[EventTrigger] = None,
-        guard: Optional[EventTrigger] = None,
+        trigger: Optional[EventTrigger] = None,
+        need: Optional[EventTrigger] = None,
     ) -> None:
         self.event = event
         self.source = source
         self.target = target
-        self.action = action
-        self.guard = Guard(guard)
+        self.trigger = trigger
+        self.need = Need(need)
 
     def __str__(self) -> str:
         return self.event
@@ -315,26 +293,26 @@ class Transition:
     def is_valid_from(self, source: 'State') -> bool:
         return source in _tuplize(self.source)
 
-    def check_guard(self, machine: 'StateMachine') -> bool:
-        return self.guard.check(machine)
+    def check_need(self, machine: 'StateMachine') -> bool:
+        return self.need.check(machine)
 
     def run(self, machine: 'StateMachine', *args: Any, **kwargs: Any) -> None:
-        machine._current_state_object.run_finish(machine)
+        machine._current_state_object.run_after(machine)
         machine._new_state(self.target)
-        self.target.run_start(machine)
-        ActionRunner(machine).run(self.action, *args, **kwargs)
+        self.target.run_before(machine)
+        TriggerRunner(machine).run(self.trigger, *args, **kwargs)
 
 
 class State:
     def __init__(
         self,
         name: str,
-        start: Optional[EventTriggers] = None,
-        finish: Optional[EventTriggers] = None,
+        before: Optional[EventTriggers] = None,
+        after: Optional[EventTriggers] = None,
     ) -> None:
         self.name = name
-        self.start = start
-        self.finish = finish
+        self.before = before
+        self.after = after
 
     def __str__(self) -> str:
         return self.name
@@ -345,56 +323,56 @@ class State:
 
         return state_callback
 
-    def run_start(self, machine: 'StateMachine') -> None:
-        ActionRunner(machine).run(self.start)
+    def run_before(self, machine: 'StateMachine') -> None:
+        TriggerRunner(machine).run(self.before)
 
-    def run_finish(self, machine: 'StateMachine') -> None:
-        ActionRunner(machine).run(self.finish)
+    def run_after(self, machine: 'StateMachine') -> None:
+        TriggerRunner(machine).run(self.after)
 
 
-class ActionRunner:
+class TriggerRunner:
     def __init__(self, machine: 'StateMachine') -> None:
         self.machine = machine
 
     def run(
         self,
-        action_param: Optional[EventTriggers] = None,
+        trigger_param: Optional[EventTriggers] = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        if not action_param:
+        if not trigger_param:
             return
-        action_items = _tuplize(action_param)
-        for action_item in action_items:
-            self._run_action(action_item, *args, **kwargs)
+        trigger_items = _tuplize(trigger_param)
+        for trigger_item in trigger_items:
+            self._run_trigger(trigger_item, *args, **kwargs)
 
-    def _run_action(
-        self, action: EventTrigger, *args: Any, **kwargs: Any
+    def _run_trigger(
+        self, trigger: EventTrigger, *args: Any, **kwargs: Any
     ) -> None:
-        if callable(action):
-            self._try_to_run_with_args(action, self.machine, *args, **kwargs)
+        if callable(trigger):
+            self._try_to_run_with_args(trigger, self.machine, *args, **kwargs)
         else:
             self._try_to_run_with_args(
-                getattr(self.machine, action), *args, **kwargs
+                getattr(self.machine, trigger), *args, **kwargs
             )
 
     def _try_to_run_with_args(
-        self, action: Callable, *args: Any, **kwargs: Any
+        self, trigger: Callable, *args: Any, **kwargs: Any
     ) -> None:
         try:
-            action(*args, **kwargs)
+            trigger(*args, **kwargs)
         except TypeError:
-            action()
+            trigger()
 
 
-class Guard:
-    def __init__(self, guard: Optional[EventTrigger] = None) -> None:
-        self.guard = guard
+class Need:
+    def __init__(self, need: Optional[EventTrigger] = None) -> None:
+        self.need = need
 
     def check(self, machine: 'StateMachine') -> bool:
-        if self.guard is None:
+        if self.need is None:
             return True
-        items = _tuplize(self.guard)
+        items = _tuplize(self.need)
         result = True
         for item in items:
             result = result and self._evaluate(machine, item)
@@ -404,10 +382,10 @@ class Guard:
         if callable(item):
             return item(machine)
         else:
-            guard = getattr(machine, item)
-            if callable(guard):
-                guard = guard()
-            return guard
+            need = getattr(machine, item)
+            if callable(need):
+                need = need()
+            return need
 
 
 class InvalidConfiguration(Exception):
@@ -422,7 +400,7 @@ class InvalidState(Exception):
     pass
 
 
-class GuardNotSatisfied(Exception):
+class NeedNotSatisfied(Exception):
     pass
 
 

@@ -6,18 +6,18 @@ class ActionMachine(StateMachine):
 
     state(
         'created',
-        start='about_to_create',
-        finish=['other_post_create', 'post_create'],
+        before='about_to_create',
+        after=['other_post_create', 'post_create'],
     )
-    state('waiting', start=['pre_wait', 'other_pre_wait'])
+    state('waiting', before=['pre_wait', 'other_pre_wait'])
     initial_state = 'created'
     transition(source='created', event='queue', target='waiting')
 
     def __init__(self):
-        self.start_create = False
+        self.before_create = False
         super(ActionMachine, self).__init__()
-        self.is_start_aware = False
-        self.is_finish_aware = False
+        self.is_before_aware = False
+        self.is_after_aware = False
         self.pre_wait_aware = False
         self.other_pre_wait_aware = False
         self.post_create_aware = False
@@ -25,19 +25,19 @@ class ActionMachine(StateMachine):
         self.count = 0
 
     def pre_wait(self):
-        self.is_start_aware = True
+        self.is_before_aware = True
         self.pre_wait_aware = True
         if getattr(self, 'pre_wait_expectation', None):
             self.pre_wait_expectation()
 
     def post_create(self):
-        self.is_finish_aware = True
+        self.is_after_aware = True
         self.post_create_aware = True
         if getattr(self, 'post_create_expectation', None):
             self.post_create_expectation()
 
     def about_to_create(self):
-        self.start_create = True
+        self.before_create = True
 
     def other_pre_wait(self):
         self.other_pre_wait_aware = True
@@ -47,20 +47,20 @@ class ActionMachine(StateMachine):
 
 
 class FluidityAction(unittest.TestCase):
-    def test_it_runs_start_action_before_machine_starts_a_given_state(self):
+    def test_it_runs_before_trigger_before_machine_befores_a_given_state(self):
         machine = ActionMachine()
-        assert machine.is_start_aware is False
+        assert machine.is_before_aware is False
         machine.queue()
-        assert machine.is_start_aware is True
+        assert machine.is_before_aware is True
 
-    def test_it_runs_finish_action_after_machine_finishs_a_given_state(self):
+    def test_it_runs_after_trigger_after_machine_afters_a_given_state(self):
         machine = ActionMachine()
-        assert machine.is_finish_aware is False
+        assert machine.is_after_aware is False
         machine.queue()
-        assert machine.is_start_aware is True
+        assert machine.is_before_aware is True
 
-    def test_it_runs_finish_action_before_start_action(self):
-        '''it runs old state's finish action before new state's start action'''
+    def test_it_runs_after_trigger_before_before_trigger(self):
+        """it runs old state's after trigger before new state's before trigger"""
         machine = ActionMachine()
 
         def post_create_expectation(_self):
@@ -79,10 +79,10 @@ class FluidityAction(unittest.TestCase):
         )
         machine.queue()
 
-    def test_it_runs_start_action_for_initial_state_at_creation(self):
-        assert ActionMachine().start_create is True
+    def test_it_runs_before_trigger_for_initial_state_at_creation(self):
+        assert ActionMachine().before_create is True
 
-    def test_it_accepts_many_start_actions(self):
+    def test_it_accepts_many_before_triggers(self):
         machine = ActionMachine()
         assert machine.pre_wait_aware is False
         assert machine.other_pre_wait_aware is False
@@ -90,7 +90,7 @@ class FluidityAction(unittest.TestCase):
         assert machine.pre_wait_aware is True
         assert machine.other_pre_wait_aware is True
 
-    def test_it_accepts_finish_actions(self):
+    def test_it_accepts_after_triggers(self):
         machine = ActionMachine()
         assert machine.post_create_aware is False
         assert machine.other_post_create_aware is False

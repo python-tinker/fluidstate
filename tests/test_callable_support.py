@@ -1,37 +1,37 @@
 import unittest
 from fluidity import StateMachine, state, transition
-from fluidity import GuardNotSatisfied
+from fluidity import NeedNotSatisfied
 
 footsteps = []
 
 
 class Foo:
     def bar(self):
-        footsteps.append('finish looking')
+        footsteps.append('after looking')
 
 
 foo = Foo()
 
 
-def start_falling_function():
-    footsteps.append('start falling')
+def before_falling_function():
+    footsteps.append('before falling')
 
 
 class JumperGuy(StateMachine):
     state(
         'looking',
-        start=lambda jumper: jumper.append('start looking'),
-        finish=foo.bar,
+        before=lambda jumper: jumper.append('before looking'),
+        after=foo.bar,
     )
-    state('falling', start=start_falling_function)
+    state('falling', before=before_falling_function)
     initial_state = 'looking'
 
     transition(
         source='looking',
         event='jump',
         target='falling',
-        action=lambda jumper: jumper.append('action jump'),
-        guard=lambda jumper: jumper.append('guard jump') is None,
+        trigger=lambda jumper: jumper.append('trigger jump'),
+        need=lambda jumper: jumper.append('need jump') is None,
     )
 
     def __init__(self):
@@ -49,15 +49,15 @@ class CallableSupport(unittest.TestCase):
         assert len(footsteps) == 5
         assert sorted(footsteps) == sorted(
             [
-                'start looking',
-                'finish looking',
-                'start falling',
-                'action jump',
-                'guard jump',
+                'before looking',
+                'after looking',
+                'before falling',
+                'trigger jump',
+                'need jump',
             ]
         )
 
-    def test_it_should_deny_state_change_if_guard_callable_returns_false(self):
+    def test_it_should_deny_state_change_if_need_callable_returns_false(self):
         class Door(StateMachine):
             state('open')
             state('closed')
@@ -66,7 +66,7 @@ class CallableSupport(unittest.TestCase):
                 source='closed',
                 event='open',
                 target='open',
-                guard=lambda d: not door.locked,
+                need=lambda d: not door.locked,
             )
 
             def locked(self):
@@ -74,7 +74,7 @@ class CallableSupport(unittest.TestCase):
 
         door = Door()
         door.locked = True
-        with self.assertRaises(GuardNotSatisfied):
+        with self.assertRaises(NeedNotSatisfied):
             door.open()
 
 

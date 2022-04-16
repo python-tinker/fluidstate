@@ -7,26 +7,26 @@ class Door(StateMachine):
     state('open')
     initial_state = 'closed'
     transition(
-        source='closed', event='open', target='open', action='open_action'
+        source='closed', event='open', target='open', trigger='open_trigger'
     )
     transition(
         source='open',
         event='close',
         target='closed',
-        action='close_action',
+        trigger='close_trigger',
     )
 
-    def open_action(self, when, where):
+    def open_trigger(self, when, where):
         self.when = when
         self.where = where
 
-    def close_action(self, *args, **kwargs):
+    def close_trigger(self, *args, **kwargs):
         self.args = args
         self.kwargs = kwargs
 
 
 class EventParameters(unittest.TestCase):
-    def test_it_pass_parameters_received_by_event_to_action(self):
+    def test_it_pass_parameters_received_by_event_to_trigger(self):
         door = Door()
         door.open('now!', 'there!')
         assert hasattr(door, 'when')
@@ -34,7 +34,7 @@ class EventParameters(unittest.TestCase):
         assert hasattr(door, 'where')
         assert door.where == 'there!'
 
-    def test_it_pass_args_and_kwargs_to_action(self):
+    def test_it_pass_args_and_kwargs_to_trigger(self):
         door = Door()
         door.open('anytime', 'anywhere')
         door.close('1', 2, object, test=9, it=8, works=7)

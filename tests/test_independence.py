@@ -7,8 +7,8 @@ class MyMachine(StateMachine):
 
     initial_state = 'off'
 
-    state('off', start='inc_off')
-    state('on', start='inc_on')
+    state('off', before='inc_off')
+    state('on', before='inc_on')
 
     transition(source='off', event='toggle', target='on')
     transition(source='on', event='toggle', target='off')
@@ -38,7 +38,7 @@ class MachineIndependence(unittest.TestCase):
         assert machine_a.current_state == 'on'
         assert machine_b.current_state == 'off'
 
-    def test_two_machines_dont_share_actions(self):
+    def test_two_machines_dont_share_triggers(self):
         machine_a = MyMachine()
         machine_b = MyMachine()
 
