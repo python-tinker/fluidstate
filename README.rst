@@ -1,7 +1,7 @@
 Fluidity
 ========
 
-State machine implementation for Python objects.
+Compact state machine that can be vendored.
 
 
 How to use
@@ -114,8 +114,7 @@ Just run::
     tox
 
 
-Background
-----------
+Attribution
+-----------
 
-This is forked from: https://github.com/nsi-iff/fluidity
-Original author is: Rodrigo Manhães
+This is forked from https://github.com/nsi-iff/fluidity created by Rodrigo Manhães.
