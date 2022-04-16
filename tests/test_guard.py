@@ -1,7 +1,7 @@
 import unittest
 
 from fluidstate import StateMachine, state, transition
-from fluidstate import NeedNotSatisfied
+from fluidstate import FluidstateNeedNotSatisfied
 
 
 class FallingMachine(StateMachine):
@@ -38,14 +38,14 @@ class FluidityNeed(unittest.TestCase):
 
     def test_it_forbids_transition_if_not_satisfied(self):
         machine = FallingMachine(ready=False)
-        with self.assertRaises(NeedNotSatisfied):
+        with self.assertRaises(FluidstateNeedNotSatisfied):
             machine.jump()
 
     def test_it_may_be_an_attribute(self):
         """it may be an attribute, not only a method"""
         machine = FallingMachine()
         machine.ready_to_fly = False
-        with self.assertRaises(NeedNotSatisfied):
+        with self.assertRaises(FluidstateNeedNotSatisfied):
             machine.jump()
 
         machine.ready_to_fly = True
@@ -67,13 +67,13 @@ class FluidityNeed(unittest.TestCase):
         machine = FallingMachine()
         machine.ready_to_fly = False
         machine.high_enough_flag = True
-        with self.assertRaises(NeedNotSatisfied):
+        with self.assertRaises(FluidstateNeedNotSatisfied):
             machine.jump()
 
         machine = FallingMachine()
         machine.ready_to_fly = True
         machine.high_enough_flag = False
-        with self.assertRaises(NeedNotSatisfied):
+        with self.assertRaises(FluidstateNeedNotSatisfied):
             machine.jump()
 
 

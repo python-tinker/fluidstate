@@ -1,6 +1,6 @@
 import unittest
 from fluidstate import StateMachine, state, transition
-from fluidstate import InvalidTransition
+from fluidstate import FluidstateInvalidTransition
 
 
 class MyMachine(StateMachine):

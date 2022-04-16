@@ -60,7 +60,15 @@ def transition(
     log.info(
         f"recieved transition: {event}, {source}, {target}, {trigger}, {need}"
     )
-    _transition_gatherer.append([event, source, target, trigger, need])
+    _transition_gatherer.append(
+        {
+            'event': event,
+            'source': source,
+            'target': target,
+            'trigger': trigger,
+            'need': need,
+        }
+    )
 
 
 _state_gatherer = []
@@ -72,7 +80,7 @@ def state(
     after: Optional[EventTriggers] = None,
 ) -> None:
     log.info(f"recieved state: {name}, {before}, {before}")
-    _state_gatherer.append([name, before, after])
+    _state_gatherer.append({'name': name, 'before': before, 'after': after})
 
 
 class MetaStateMachine(type):
@@ -91,18 +99,20 @@ class MetaStateMachine(type):
         obj._class_states = {}
 
         for s in _state_gatherer:
-            obj._class_states[str(s[0])] = State(str(s[0]), s[1], s[2])
+            obj._class_states[str(s['name'])] = State(
+                str(s['name']), s['before'], s['after']
+            )
 
         for t in _transition_gatherer:
             transition = Transition(
-                event=str(t[0]),
-                source=[obj._class_states[s] for s in _tuplize(t[1])],
-                target=obj._class_states[str(t[2])],
-                trigger=t[3],  # type: ignore
-                need=t[4],  # type: ignore
+                event=str(t['event']),
+                source=[obj._class_states[s] for s in _tuplize(t['source'])],
+                target=obj._class_states[str(t['target'])],
+                trigger=t['trigger'],  # type: ignore
+                need=t['need'],  # type: ignore
             )
             obj._class_transitions.append(transition)
-            setattr(obj, str(t[0]), transition.event_method())
+            setattr(obj, str(t['event']), transition.event_method())
 
         _transition_gatherer = []
         _state_gatherer = []
@@ -135,9 +145,9 @@ class StateMachine(metaclass=MetaStateMachine):
 
     def _validate_machine_definitions(self) -> None:
         if len(self._states) < 2:
-            raise InvalidConfiguration('There must be at least two states')
+            raise FluidstateInvalidConfig('There must be at least two states')
         if not getattr(self, 'initial_state', None):
-            raise InvalidConfiguration('There must exist an initial state')
+            raise FluidstateInvalidConfig('There must exist an initial state')
 
     def add_state(
         self,
@@ -157,12 +167,7 @@ class StateMachine(metaclass=MetaStateMachine):
     def current_state(self) -> str:
         return self._current_state_object.name
 
-    # def __changing_state(self, source: str, target: str) -> None:
-    #     """Call whenever a state change is executed."""
-    #     pass
-
     def _new_state(self, state: 'State') -> None:
-        # self.__changing_state(self._current_state_object.name, state.name)
         self._current_state_object = state
 
     def _state_objects(self) -> List['State']:
@@ -214,7 +219,7 @@ class StateMachine(metaclass=MetaStateMachine):
         for state in self._state_objects():
             if state.name == name:
                 return state
-        raise InvalidState(f"state could not be found: {name}")
+        raise FluidstateInvalidState(f"state could not be found: {name}")
 
     def _transitions_by_name(self, name: str) -> List['Transition']:
         return list(
@@ -235,7 +240,7 @@ class StateMachine(metaclass=MetaStateMachine):
             )
         )
         if len(valid_transitions) == 0:
-            raise InvalidTransition(
+            raise FluidstateInvalidTransition(
                 f"Cannot {transitions[0].event} from {self.current_state}"
             )
         return valid_transitions
@@ -246,9 +251,11 @@ class StateMachine(metaclass=MetaStateMachine):
             if transition.check_need(self):
                 allowed_transitions.append(transition)
         if len(allowed_transitions) == 0:
-            raise NeedNotSatisfied("Need is not satisfied for this transition")
+            raise FluidstateNeedNotSatisfied(
+                "Need is not satisfied for this transition"
+            )
         elif len(allowed_transitions) > 1:
-            raise ForkedTransition(
+            raise FluidstateForkedTransition(
                 "More than one transition was allowed for this event"
             )
         return allowed_transitions[0]
@@ -381,21 +388,21 @@ class Need:
             return need
 
 
-class InvalidConfiguration(Exception):
+class FluidstateInvalidConfig(Exception):
     pass
 
 
-class InvalidTransition(Exception):
+class FluidstateInvalidTransition(Exception):
     pass
 
 
-class InvalidState(Exception):
+class FluidstateInvalidState(Exception):
     pass
 
 
-class NeedNotSatisfied(Exception):
+class FluidstateNeedNotSatisfied(Exception):
     pass
 
 
-class ForkedTransition(Exception):
+class FluidstateForkedTransition(Exception):
     pass

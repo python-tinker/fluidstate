@@ -1,5 +1,5 @@
 import unittest
-from fluidstate import StateMachine, state, transition, ForkedTransition
+from fluidstate import StateMachine, state, transition, FluidstateForkedTransition
 
 
 class LoanRequest(StateMachine):
@@ -55,7 +55,7 @@ class FluidityEventSupportsMultipleTransitions(unittest.TestCase):
         request = LoanRequest()
         request.analyze()
         request.truify = True
-        with self.assertRaises(ForkedTransition):
+        with self.assertRaises(FluidstateForkedTransition):
             request.forward_analysis_result()
             # message="More than one transition was allowed for this event",
 

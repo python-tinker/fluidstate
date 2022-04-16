@@ -1,6 +1,6 @@
 import unittest
 from fluidstate import StateMachine, state, transition
-from fluidstate import NeedNotSatisfied
+from fluidstate import FluidstateNeedNotSatisfied
 
 footsteps = []
 
@@ -74,7 +74,7 @@ class CallableSupport(unittest.TestCase):
 
         door = Door()
         door.locked = True
-        with self.assertRaises(NeedNotSatisfied):
+        with self.assertRaises(FluidstateNeedNotSatisfied):
             door.open()
 
 
