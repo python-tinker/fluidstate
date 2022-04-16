@@ -34,31 +34,31 @@ For demonstrating more advanced capabilities::
 
     class Relationship(StateMachine):
         initial_state = lambda relationship: relationship.strictly_for_fun() and 'intimate' or 'dating'
-        state('dating', start='make_happy', finish='make_depressed')
-        state('intimate', start='make_very_happy', finish='never_speak_again')
-        state('married', start='give_up_intimacy', finish='buy_exotic_car_and_buy_a_combover')
+        state('dating', before='make_happy', after='make_depressed')
+        state('intimate', before='make_very_happy', after='never_speak_again')
+        state('married', before='give_up_intimacy', after='buy_exotic_car')
 
-        transition(source='dating', event='get_intimate', target='intimate', guard='drunk')
-        transition(source=['dating', 'intimate'], event='get_married', target='married', guard='willing_to_give_up_manhood')
+        transition(source='dating', event='get_intimate', target='intimate', need='drunk')
+        transition(source=['dating', 'intimate'], event='get_married', target='married', need='willing_to_give_up_manhood')
 
         def strictly_for_fun(self): pass
-        def drunk(self): pass
+        def drunk(self): return True
         def willing_to_give_up_manhood(self): return True
         def make_happy(self): pass
         def make_depressed(self): pass
         def make_very_happy(self): pass
         def never_speak_again(self): pass
         def give_up_intimacy(self): pass
-        def buy_exotic_car_and_buy_a_combover(self): pass
+        def buy_exotic_car(self): pass
 
 
 States
 ------
 
-A Fluidity state machine must have one initial state and at least two additional states.
+A Fluidity state machine must have one initial state and at least one other additional state.
 
-A state may have start and finish callbacks, for running some code on state start
-and finish, respectively. These params can be method names (as strings),
+A state may have before and after callbacks, for running some code on state *before*
+and *after*, respectively. These params can be method names (as strings),
 callables, or lists of method names or callables.
 
 
@@ -67,21 +67,21 @@ Transitions
 
 Transitions lead the machine from a state to another. Transitions must have
 *source*, *target*, and *event* parameters. *source* is one or more (as list) states
-from which the transition can be started. *target* is the state to which the
+from which the transition can be beforeed. *target* is the state to which the
 transition will lead the machine. *event* is the method that have to be called
 to launch the transition. This method is automatically created by the Fluidity
 engine.
 
-A transition can have optional *action* and *guard* parameters. *action* is a
+A transition can have optional *trigger* and *need* parameters. *trigger* is a
 method (or callable) that will be called when transition is launched. If
-parameters are passed to the event method, they are passed to the *action*
-method, if it accepts these parameters. *guard* is a method (or callable) that
+parameters are passed to the event method, they are passed to the *trigger*
+method, if it accepts these parameters. *need* is a method (or callable) that
 is called to allow or deny the transition, depending on the result of its
-execution. Both "action" and *guard* can be lists.
+execution. Both "trigger" and *need* can be lists.
 
 The same event can be in multiple transitions, going to different states, having
-their respective guards as selectors. For the transitions having the same event,
-only one guard should return a true value at a time.
+their respective needs as selectors. For the transitions having the same event,
+only one need should return a true value at a time.
 
 
 Individuation
@@ -112,3 +112,10 @@ How to run tests
 Just run::
 
     tox
+
+
+Background
+----------
+
+This is forked from: https://github.com/nsi-iff/fluidity
+Original author is: Rodrigo Manhães

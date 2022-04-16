@@ -1,8 +1,8 @@
 [tool.poetry]
 name = "fluidity"
-version = "0.2.2"
-repository = "https://github.com/nsi-iff/fluidity"
-description = "State machine implementation for Python objects."
+version = "1.0.0a0"
+repository = "ihttps://github.com/kuwv/python-fluidity"
+description = "Compact state machine in Python that can be vendored."
 authors = ["Jesse P. Johnson <jpj6652@gmail.com>"]
 license = "MIT"
 readme = "README.rst"
