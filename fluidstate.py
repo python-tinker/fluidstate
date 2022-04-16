@@ -106,14 +106,13 @@ class MetaStateMachine(type):
 
         _transition_gatherer = []
         _state_gatherer = []
-
         return obj
 
 
 class StateMachine(metaclass=MetaStateMachine):
     initial_state: str
-    _states: Dict[str, Any]
-    _transitions: List[Any]
+    _states: Dict[str, 'State']
+    _transitions: List['Transition']
 
     def __new__(cls, *args: Any, **kwargs: Any) -> 'StateMachine':
         obj = super(StateMachine, cls).__new__(cls)
@@ -122,23 +121,17 @@ class StateMachine(metaclass=MetaStateMachine):
         return obj
 
     def __init__(self) -> None:
-        self._bring_definitions_to_object_level()
-        self._inject_into_parts()
+        self.__bring_definitions_to_object_level()
         self._validate_machine_definitions()
         if callable(self.initial_state):
             self.initial_state = self.initial_state()
         self._current_state_object = self._state_by_name(self.initial_state)
         self._current_state_object.run_before(self)
-        self._create_state_callbacks()
+        self.__create_state_callbacks()
 
-    def _bring_definitions_to_object_level(self) -> None:
+    def __bring_definitions_to_object_level(self) -> None:
         self._states.update(self.__class__._class_states)
         self._transitions.extend(self.__class__._class_transitions)
-
-    def _inject_into_parts(self) -> None:
-        for collection in [self._states.values(), self._transitions]:
-            for component in collection:
-                component.machine = self
 
     def _validate_machine_definitions(self) -> None:
         if len(self._states) < 2:
@@ -164,12 +157,12 @@ class StateMachine(metaclass=MetaStateMachine):
     def current_state(self) -> str:
         return self._current_state_object.name
 
-    def changing_state(self, source: str, target: str) -> None:
-        """Call whenever a state change is executed."""
-        pass
+    # def __changing_state(self, source: str, target: str) -> None:
+    #     """Call whenever a state change is executed."""
+    #     pass
 
     def _new_state(self, state: 'State') -> None:
-        self.changing_state(self._current_state_object.name, state.name)
+        # self.__changing_state(self._current_state_object.name, state.name)
         self._current_state_object = state
 
     def _state_objects(self) -> List['State']:
@@ -209,7 +202,7 @@ class StateMachine(metaclass=MetaStateMachine):
         this_transition = self._check_needs(transitions)
         this_transition.run(self, *args, **kwargs)
 
-    def _create_state_callbacks(self) -> None:
+    def __create_state_callbacks(self) -> None:
         for state in self._state_objects():
             setattr(
                 self,
@@ -300,7 +293,7 @@ class Transition:
         machine._current_state_object.run_after(machine)
         machine._new_state(self.target)
         self.target.run_before(machine)
-        TriggerRunner(machine).run(self.trigger, *args, **kwargs)
+        Trigger(machine).run(self.trigger, *args, **kwargs)
 
 
 class State:
@@ -324,13 +317,13 @@ class State:
         return state_callback
 
     def run_before(self, machine: 'StateMachine') -> None:
-        TriggerRunner(machine).run(self.before)
+        Trigger(machine).run(self.before)
 
     def run_after(self, machine: 'StateMachine') -> None:
-        TriggerRunner(machine).run(self.after)
+        Trigger(machine).run(self.after)
 
 
-class TriggerRunner:
+class Trigger:
     def __init__(self, machine: 'StateMachine') -> None:
         self.machine = machine
 
@@ -344,19 +337,19 @@ class TriggerRunner:
             return
         trigger_items = _tuplize(trigger_param)
         for trigger_item in trigger_items:
-            self._run_trigger(trigger_item, *args, **kwargs)
+            self.__run_trigger(trigger_item, *args, **kwargs)
 
-    def _run_trigger(
+    def __run_trigger(
         self, trigger: EventTrigger, *args: Any, **kwargs: Any
     ) -> None:
         if callable(trigger):
-            self._try_to_run_with_args(trigger, self.machine, *args, **kwargs)
+            self.__try_to_run_with_args(trigger, self.machine, *args, **kwargs)
         else:
-            self._try_to_run_with_args(
+            self.__try_to_run_with_args(
                 getattr(self.machine, trigger), *args, **kwargs
             )
 
-    def _try_to_run_with_args(
+    def __try_to_run_with_args(
         self, trigger: Callable, *args: Any, **kwargs: Any
     ) -> None:
         try:
@@ -375,10 +368,10 @@ class Need:
         items = _tuplize(self.need)
         result = True
         for item in items:
-            result = result and self._evaluate(machine, item)
+            result = result and self.__evaluate(machine, item)
         return result
 
-    def _evaluate(self, machine: 'StateMachine', item: EventTrigger) -> bool:
+    def __evaluate(self, machine: 'StateMachine', item: EventTrigger) -> bool:
         if callable(item):
             return item(machine)
         else:
