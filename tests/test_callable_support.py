@@ -1,6 +1,6 @@
 import unittest
-from fluidity import StateMachine, state, transition
-from fluidity import NeedNotSatisfied
+from fluidstate import StateMachine, state, transition
+from fluidstate import NeedNotSatisfied
 
 footsteps = []
 

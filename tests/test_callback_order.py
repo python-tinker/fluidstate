@@ -1,5 +1,5 @@
 import unittest
-from fluidity import StateMachine, state, transition
+from fluidstate import StateMachine, state, transition
 
 
 class CrazyGuy(StateMachine):

@@ -1,6 +1,6 @@
 import unittest
 
-from fluidity import StateMachine, transition, state
+from fluidstate import StateMachine, transition, state
 
 
 class FluidityState(unittest.TestCase):

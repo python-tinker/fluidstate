@@ -1,5 +1,5 @@
 import unittest
-from fluidity import StateMachine, state, InvalidConfiguration
+from fluidstate import StateMachine, state, InvalidConfiguration
 
 
 class FluidityConfigurationValidation(unittest.TestCase):

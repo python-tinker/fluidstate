@@ -9,7 +9,7 @@ How to use
 
 A very simple example taken from specs::
 
-    from fluidity import StateMachine, state, transition
+    from fluidstate import StateMachine, state, transition
 
     class SimpleMachine(StateMachine):
 
@@ -30,7 +30,7 @@ A very simple example taken from specs::
 
 For demonstrating more advanced capabilities::
 
-    from fluidity import StateMachine, state, transition
+    from fluidstate import StateMachine, state, transition
 
     class Relationship(StateMachine):
         initial_state = lambda relationship: relationship.strictly_for_fun() and 'intimate' or 'dating'
@@ -103,7 +103,7 @@ How to install
 
 Just run::
 
-    pip install fluidity
+    pip install fluidstate
 
 
 How to run tests
