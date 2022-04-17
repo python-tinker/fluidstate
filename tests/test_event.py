@@ -20,7 +20,7 @@ class MyMachine(StateMachine):
     )
 
 
-class FluidityEvent(unittest.TestCase):
+class FluidstateEvent(unittest.TestCase):
     def test_its_declaration_creates_a_method_with_its_name(self):
         machine = MyMachine()
         assert hasattr(machine, 'queue') and callable(machine.queue)

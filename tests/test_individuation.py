@@ -10,7 +10,7 @@ class Door(StateMachine):
 
 
 class IndividuationSpec(unittest.TestCase):
-    """Fluidity object (individuation)"""
+    """Fluidstate object (individuation)"""
 
     def setUp(self):
         self.door = Door()

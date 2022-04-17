@@ -71,7 +71,7 @@ For demonstrating more advanced capabilities::
 States
 ------
 
-A Fluidity state machine must have one initial state and at least one other additional state.
+A Fluidstate state machine must have one initial state and at least one other additional state.
 
 A state may have before and after callbacks, for running some code on state *before*
 and *after*, respectively. These params can be method names (as strings),
@@ -85,7 +85,7 @@ Transitions lead the machine from a state to another. Transitions must have
 *source*, *target*, and *event* parameters. *source* is one or more (as list) states
 from which the transition can be beforeed. *target* is the state to which the
 transition will lead the machine. *event* is the method that have to be called
-to launch the transition. This method is automatically created by the Fluidity
+to launch the transition. This method is automatically created by the Fluidstate
 engine.
 
 A transition can have optional *trigger* and *need* parameters. *trigger* is a

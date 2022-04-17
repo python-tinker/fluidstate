@@ -2,7 +2,7 @@ import unittest
 from fluidstate import StateMachine, state, FluidstateInvalidConfig
 
 
-class FluidityConfigurationValidation(unittest.TestCase):
+class FluidstateConfigurationValidation(unittest.TestCase):
     def test_it_requires_at_least_two_states(self):
         class MyMachine(StateMachine):
             pass

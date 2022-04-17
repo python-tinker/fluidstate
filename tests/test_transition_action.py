@@ -26,7 +26,7 @@ class CrazyGuy(StateMachine):
         self.accelerating = True
 
 
-class FluidityTransitionAction(unittest.TestCase):
+class FluidstateTransitionAction(unittest.TestCase):
     def test_it_runs_when_transition_occurs(self):
         guy = CrazyGuy()
         assert guy.at_risk is False

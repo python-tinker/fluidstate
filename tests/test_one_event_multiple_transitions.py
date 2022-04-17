@@ -37,7 +37,7 @@ class LoanRequest(StateMachine):
         return not self.accepted or getattr(self, 'truify', False)
 
 
-class FluidityEventSupportsMultipleTransitions(unittest.TestCase):
+class FluidstateEventSupportsMultipleTransitions(unittest.TestCase):
     """Event chooses one of multiple transitions, based in their needs"""
 
     def test_it_selects_the_transition_having_a_passing_need(self):

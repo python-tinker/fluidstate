@@ -3,7 +3,7 @@ import unittest
 from fluidstate import StateMachine, transition, state
 
 
-class FluidityState(unittest.TestCase):
+class FluidstateState(unittest.TestCase):
     def test_it_defines_states(self):
         class MyMachine(StateMachine):
             state('unread')

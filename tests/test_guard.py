@@ -27,7 +27,7 @@ class FallingMachine(StateMachine):
         return self.high_enough_flag
 
 
-class FluidityNeed(unittest.TestCase):
+class FluidstateNeed(unittest.TestCase):
     def test_it_allows_transition_if_satisfied(self):
         machine = FallingMachine()
         try:

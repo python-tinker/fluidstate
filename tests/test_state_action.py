@@ -46,7 +46,7 @@ class ActionMachine(StateMachine):
         self.other_post_create_aware = True
 
 
-class FluidityAction(unittest.TestCase):
+class FluidstateAction(unittest.TestCase):
     def test_it_runs_before_trigger_before_machine_befores_a_given_state(self):
         machine = ActionMachine()
         assert machine.is_before_aware is False
