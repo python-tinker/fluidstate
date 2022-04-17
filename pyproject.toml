@@ -35,6 +35,22 @@ docstr-coverage = "^1.2.0"
 bandit = "^1.6.2"
 pylint = "^2.9.5"
 mkdocstrings = "^0.16.2"
+proman-versioning = "^0.5.0-alpha.2"
+
+[tool.proman.versioning]
+enable_devreleases = false
+
+[[tool.proman.versioning.files]]
+filepath = "fluidstate.py"
+pattern = "__version__ = '${version}'"
+
+[[tool.proman.versioning.files]]
+filepath = "tests/test_version.py"
+pattern = "__version__ == '${version}'"
+
+[[tool.proman.versioning.files]]
+filepath = "pyproject.toml"
+pattern = "version = \"${version}\""
 
 [tool.pydocstyle]
 ignore = [
