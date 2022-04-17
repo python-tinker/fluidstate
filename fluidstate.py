@@ -34,6 +34,15 @@ from typing import (
     Union,
 )
 
+__author__ = 'Jesse P. Johnson'
+__author_email__ = 'jpj6652@gmail.com'
+__title__ = 'fluidstate'
+__description__ = 'Compact state machine that can be vendored.'
+__version__ = '1.0.0a0'
+__license__ = 'MIT'
+__copyright__ = 'Copyright 2022 Jesse Johnson.'
+__all__ = ('StateMachine', 'state', 'transition')
+
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
@@ -84,7 +93,7 @@ def state(
 
 
 class MetaStateMachine(type):
-    _class_states: Dict[str, Any]
+    _class_states: Dict[str, 'State']
     _class_transitions: List['Transition']
 
     def __new__(
@@ -93,6 +102,11 @@ class MetaStateMachine(type):
         bases: Tuple[type, ...],
         attrs: Dict[str, Any],
     ) -> 'MetaStateMachine':
+        # if 'logging_enabled' in kwargs and kwargs.get('logging_enabled'):
+        #     for handler in log.handlers[:]:
+        #         log.removeHandler(handler)
+        #     log.addHandler(logging.StreamHandler())
+
         global _transition_gatherer, _state_gatherer
         obj = super(MetaStateMachine, cls).__new__(cls, name, bases, attrs)
         obj._class_transitions = []
@@ -131,6 +145,7 @@ class StateMachine(metaclass=MetaStateMachine):
         return obj
 
     def __init__(self) -> None:
+        log.info('initializing statemachine')
         self.__bring_definitions_to_object_level()
         self._validate_machine_definitions()
         if callable(self.initial_state):
@@ -138,16 +153,19 @@ class StateMachine(metaclass=MetaStateMachine):
         self._current_state_object = self._state_by_name(self.initial_state)
         self._current_state_object.run_before(self)
         self.__create_state_callbacks()
+        log.info('statemachine initialization complete')
 
     def __bring_definitions_to_object_level(self) -> None:
         self._states.update(self.__class__._class_states)
         self._transitions.extend(self.__class__._class_transitions)
+        log.info('loaded states and transitions')
 
     def _validate_machine_definitions(self) -> None:
         if len(self._states) < 2:
             raise FluidstateInvalidConfig('There must be at least two states')
         if not getattr(self, 'initial_state', None):
             raise FluidstateInvalidConfig('There must exist an initial state')
+        log.info('validated statemachine')
 
     def add_state(
         self,
@@ -162,6 +180,7 @@ class StateMachine(metaclass=MetaStateMachine):
             state.callback().__get__(self, self.__class__),
         )
         self._states[name] = state
+        log.info(f"added state {name}")
 
     @property
     def current_state(self) -> str:
@@ -169,6 +188,7 @@ class StateMachine(metaclass=MetaStateMachine):
 
     def _new_state(self, state: 'State') -> None:
         self._current_state_object = state
+        log.info(f"changed state to {state.name}")
 
     def _state_objects(self) -> List['State']:
         return list(self._states.values())
@@ -198,6 +218,7 @@ class StateMachine(metaclass=MetaStateMachine):
             event,
             transition.event_method().__get__(self, self.__class__),
         )
+        log.info(f"added transition {event}")
 
     def _process_transitions(
         self, event_name: str, *args: Any, **kwargs: Any
@@ -281,10 +302,8 @@ class Transition:
 
     def event_method(self) -> Callable:
         def generated_event(machine, *args, **kwargs):
-            these_transitions = machine._process_transitions(  # noqa
-                self.event, *args, **kwargs
-            )
-            # TODO: add debugging here
+            machine._process_transitions(self.event, *args, **kwargs)
+            log.info(f"processed {self.event}")
 
         generated_event.__doc__ = f"event {self.event}"
         generated_event.__name__ = self.event
@@ -301,6 +320,7 @@ class Transition:
         machine._new_state(self.target)
         self.target.run_before(machine)
         Trigger(machine).run(self.trigger, *args, **kwargs)
+        log.info(f"executed trigger event for {self.event}")
 
 
 class State:
@@ -325,9 +345,11 @@ class State:
 
     def run_before(self, machine: 'StateMachine') -> None:
         Trigger(machine).run(self.before)
+        log.info(f"executed 'before' state change trigger for {self.name}")
 
     def run_after(self, machine: 'StateMachine') -> None:
         Trigger(machine).run(self.after)
+        log.info(f"executed 'after' state change trigger for {self.name}")
 
 
 class Trigger:
@@ -344,9 +366,9 @@ class Trigger:
             return
         trigger_items = _tuplize(trigger_param)
         for trigger_item in trigger_items:
-            self.__run_trigger(trigger_item, *args, **kwargs)
+            self._run_trigger(trigger_item, *args, **kwargs)
 
-    def __run_trigger(
+    def _run_trigger(
         self, trigger: EventTrigger, *args: Any, **kwargs: Any
     ) -> None:
         if callable(trigger):

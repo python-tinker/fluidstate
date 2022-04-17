@@ -30,26 +30,42 @@ A very simple example taken from specs::
 
 For demonstrating more advanced capabilities::
 
-    from fluidstate import StateMachine, state, transition
+        from fluidstate import StateMachine, state, transition
 
-    class Relationship(StateMachine):
-        initial_state = lambda relationship: relationship.strictly_for_fun() and 'intimate' or 'dating'
-        state('dating', before='make_happy', after='make_depressed')
-        state('intimate', before='make_very_happy', after='never_speak_again')
-        state('married', before='give_up_intimacy', after='buy_exotic_car')
+        class Relationship(StateMachine):
+            initial_state = (
+                lambda relationship: relationship.strictly_for_fun() and 'intimate' or 'dating'
+            )
 
-        transition(source='dating', event='get_intimate', target='intimate', need='drunk')
-        transition(source=['dating', 'intimate'], event='get_married', target='married', need='willing_to_give_up_manhood')
+            state('dating', before='make_happy', after='make_depressed')
+            state('intimate', before='make_very_happy', after='never_speak_again')
+            state('married', before='give_up_intimacy', after='buy_exotic_car')
 
-        def strictly_for_fun(self): pass
-        def drunk(self): return True
-        def willing_to_give_up_manhood(self): return True
-        def make_happy(self): pass
-        def make_depressed(self): pass
-        def make_very_happy(self): pass
-        def never_speak_again(self): pass
-        def give_up_intimacy(self): pass
-        def buy_exotic_car(self): pass
+            transition(source='dating', event='get_intimate', target='intimate', need='drunk')
+            transition(
+                source=['dating', 'intimate'],
+                event='get_married',
+                target='married',
+                need='willing_to_give_up_manhood'
+            )
+
+            def strictly_for_fun(self) -> None: pass
+
+            def drunk(self) -> bool: return True
+
+            def willing_to_give_up_manhood(self) -> bool: return True
+
+            def make_happy(self) -> None: pass
+
+            def make_depressed(self) -> None: pass
+
+            def make_very_happy(self) -> None: pass
+
+            def never_speak_again(self) -> None: pass
+
+            def give_up_intimacy(self) -> None: pass
+
+            def buy_exotic_car(self) -> None: pass
 
 
 States
