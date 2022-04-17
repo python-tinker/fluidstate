@@ -49,23 +49,32 @@ For demonstrating more advanced capabilities::
                 need='willing_to_give_up_manhood'
             )
 
-            def strictly_for_fun(self) -> None: pass
+            def strictly_for_fun(self) -> None:
+                pass
 
-            def drunk(self) -> bool: return True
+            def drunk(self) -> bool:
+                return True
 
-            def willing_to_give_up_manhood(self) -> bool: return True
+            def willing_to_give_up_manhood(self) -> bool:
+                return True
 
-            def make_happy(self) -> None: pass
+            def make_happy(self) -> None:
+                pass
 
-            def make_depressed(self) -> None: pass
+            def make_depressed(self) -> None:
+                pass
 
-            def make_very_happy(self) -> None: pass
+            def make_very_happy(self) -> None:
+                pass
 
-            def never_speak_again(self) -> None: pass
+            def never_speak_again(self) -> None:
+                pass
 
-            def give_up_intimacy(self) -> None: pass
+            def give_up_intimacy(self) -> None:
+                pass
 
-            def buy_exotic_car(self) -> None: pass
+            def buy_exotic_car(self) -> None:
+                pass
 
 
 States
@@ -114,18 +123,18 @@ state machine::
 These additions only affect the target object.
 
 
-How to install
---------------
+Install
+-------
 
-Just run::
+Run::
 
     pip install fluidstate
 
 
-How to run tests
-----------------
+Test
+----
 
-Just run::
+Rn::
 
     tox
 
@@ -133,4 +142,4 @@ Just run::
 Attribution
 -----------
 
-This is forked from https://github.com/nsi-iff/fluidity created by Rodrigo Manhães.
+Fluidstate is forked from https://github.com/nsi-iff/fluidity created by Rodrigo Manhães.
