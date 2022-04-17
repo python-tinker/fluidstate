@@ -1,5 +1,5 @@
-Fluidity
-========
+Fluidstate
+==========
 
 Compact state machine that can be vendored.
 
