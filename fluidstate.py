@@ -126,7 +126,7 @@ class MetaStateMachine(type):
                 need=t['need'],  # type: ignore
             )
             obj._class_transitions.append(transition)
-            setattr(obj, str(t['event']), transition.event_method())
+            setattr(obj, str(t['event']), transition.event_callback())
 
         _transition_gatherer = []
         _state_gatherer = []
@@ -154,6 +154,16 @@ class StateMachine(metaclass=MetaStateMachine):
         self._current_state_object.run_before(self)
         self.__create_state_callbacks()
         log.info('statemachine initialization complete')
+
+    def __getattr__(self, name: str) -> Any:
+        try:
+            for x in self.transitions:
+                if x.event == name:
+                    return x.event_callback()
+            else:
+                raise KeyError
+        except KeyError:
+            raise AttributeError
 
     def __bring_definitions_to_object_level(self) -> None:
         self._states.update(self.__class__._class_states)
@@ -194,8 +204,12 @@ class StateMachine(metaclass=MetaStateMachine):
         return list(self._states.values())
 
     @property
-    def states(self) -> List[str]:
-        return [s.name for s in self._state_objects()]
+    def states(self) -> list['State']:
+        return [s for s in self._state_objects()]
+
+    @property
+    def transitions(self) -> List['Transition']:
+        return self._transitions
 
     def add_transition(
         self,
@@ -216,7 +230,7 @@ class StateMachine(metaclass=MetaStateMachine):
         setattr(
             self,
             event,
-            transition.event_method().__get__(self, self.__class__),
+            transition.event_callback().__get__(self, self.__class__),
         )
         log.info(f"added transition {event}")
 
@@ -297,17 +311,30 @@ class Transition:
         self.trigger = trigger
         self.need = Need(need)
 
-    def __str__(self) -> str:
-        return self.event
+    def __repr__(self) -> str:
+        return repr(
+            "Transition({e}, source={s}, target={t})".format(
+                e=self.event,
+                s=self.source,
+                t=self.target,
+            )
+        )
 
-    def event_method(self) -> Callable:
-        def generated_event(machine, *args, **kwargs):
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, Transition):
+            return self.event == other.event
+        elif isinstance(other, str):
+            return self.event == other
+        return False
+
+    def event_callback(self) -> Callable:
+        def event(machine, *args, **kwargs):
             machine._process_transitions(self.event, *args, **kwargs)
             log.info(f"processed {self.event}")
 
-        generated_event.__doc__ = f"event {self.event}"
-        generated_event.__name__ = self.event
-        return generated_event
+        event.__doc__ = f"event {self.event}"
+        event.__name__ = self.event
+        return event
 
     def is_valid_from(self, source: 'State') -> bool:
         return source in _tuplize(self.source)
@@ -334,8 +361,15 @@ class State:
         self.before = before
         self.after = after
 
-    def __str__(self) -> str:
-        return self.name
+    def __repr__(self) -> str:
+        return repr(f"State({self.name})")
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, State):
+            return self.name == other.name
+        elif isinstance(other, str):
+            return self.name == other
+        return False
 
     def callback(self) -> Callable:
         def state_callback(self_machine):
