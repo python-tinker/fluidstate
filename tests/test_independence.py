@@ -7,11 +7,11 @@ class MyMachine(StateMachine):
 
     initial_state = 'off'
 
-    state('off', before='inc_off')
-    state('on', before='inc_on')
+    state('off', on_entry='inc_off')
+    state('on', on_entry='inc_on')
 
-    transition(source='off', event='toggle', target='on')
-    transition(source='on', event='toggle', target='off')
+    transition(before='off', event='toggle', after='on')
+    transition(before='on', event='toggle', after='off')
 
     def __init__(self):
         self.off_count = 0
@@ -30,13 +30,13 @@ class MachineIndependence(unittest.TestCase):
         machine_a = MyMachine()
         machine_b = MyMachine()
 
-        assert machine_a.current_state == 'off'
-        assert machine_b.current_state == 'off'
+        assert machine_a.state == 'off'
+        assert machine_b.state == 'off'
 
         machine_a.toggle()
 
-        assert machine_a.current_state == 'on'
-        assert machine_b.current_state == 'off'
+        assert machine_a.state == 'on'
+        assert machine_b.state == 'off'
 
     def test_two_machines_dont_share_triggers(self):
         machine_a = MyMachine()

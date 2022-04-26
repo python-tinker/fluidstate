@@ -13,11 +13,9 @@ class MyMachine(StateMachine):
     state('processed')
     state('canceled')
 
-    transition(source='created', event='queue', target='waiting')
-    transition(source='waiting', event='process', target='processed')
-    transition(
-        source=['waiting', 'created'], event='cancel', target='canceled'
-    )
+    transition(before='created', event='queue', after='waiting')
+    transition(before='waiting', event='process', after='processed')
+    transition(before=['waiting', 'created'], event='cancel', after='canceled')
 
 
 class FluidstateEvent(unittest.TestCase):
@@ -28,11 +26,11 @@ class FluidstateEvent(unittest.TestCase):
 
     def test_it_changes_machine_state(self):
         machine = MyMachine()
-        machine.current_state == 'created'
+        machine.state == 'created'
         machine.queue()
-        machine.current_state == 'waiting'
+        machine.state == 'waiting'
         machine.process()
-        machine.current_state == 'processed'
+        machine.state == 'processed'
 
     def test_it_ensures_event_order(self):
         machine = MyMachine()

@@ -7,12 +7,12 @@ class Door(StateMachine):
     state('open')
     initial_state = 'closed'
     transition(
-        source='closed', event='open', target='open', trigger='open_trigger'
+        before='closed', event='open', after='open', trigger='open_trigger'
     )
     transition(
-        source='open',
+        before='open',
         event='close',
-        target='closed',
+        after='closed',
         trigger='close_trigger',
     )
 

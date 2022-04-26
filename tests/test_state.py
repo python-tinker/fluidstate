@@ -23,7 +23,7 @@ class FluidstateState(unittest.TestCase):
 
         machine = MyMachine()
         assert machine.initial_state == 'closed'
-        assert machine.current_state == 'closed'
+        assert machine.state == 'closed'
 
     def test_it_defines_states_using_method_calls(self):
         class MyMachine(StateMachine):
@@ -31,8 +31,8 @@ class FluidstateState(unittest.TestCase):
             state('read')
             state('closed')
             initial_state = 'unread'
-            transition(source='unread', event='read', target='read')
-            transition(source='read', event='close', target='closed')
+            transition(before='unread', event='read', after='read')
+            transition(before='read', event='close', after='closed')
 
         machine = MyMachine()
         assert len(machine.states) == 3
@@ -42,7 +42,7 @@ class FluidstateState(unittest.TestCase):
             state('idle')
             state('working')
             initial_state = 'idle'
-            transition(source='idle', event='work', target='working')
+            transition(before='idle', event='work', after='working')
 
         machine = OtherMachine()
         assert len(machine.states) == 2
@@ -66,10 +66,10 @@ class FluidstateState(unittest.TestCase):
                 StateMachine.__init__(self)
 
         person = Person(worker=True)
-        person.current_state == 'awake'
+        person.state == 'awake'
 
         person = Person(worker=False)
-        person.current_state == 'sleeping'
+        person.state == 'sleeping'
 
 
 if __name__ == '__main__':

@@ -9,16 +9,16 @@ class Door(StateMachine):
     state('broken')
     initial_state = 'closed'
 
-    transition(source='closed', event='open', target='open')
-    transition(source='open', event='close', target='closed')
-    transition(source='closed', event='crack', target='broken')
+    transition(before='closed', event='open', after='open')
+    transition(before='open', event='close', after='closed')
+    transition(before='closed', event='crack', after='broken')
 
     def __init__(self):
         self.state_changes = []
         super(Door, self).__init__()
 
-    def changing_state(self, source, target):
-        self.state_changes.append((source, target))
+    def changing_state(self, before, after):
+        self.state_changes.append((before, after))
 
 
 class StateChangeNotificationSpec(unittest.TestCase):

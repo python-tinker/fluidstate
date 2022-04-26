@@ -61,21 +61,19 @@ _transition_gatherer = []
 
 def transition(
     event: str,
-    source: StateTypes,
-    target: StateType,
+    before: StateTypes,
+    after: StateType,
     trigger: Optional[EventTriggers] = None,
-    need: Optional[EventTriggers] = None,
+    guard: Optional[EventTriggers] = None,
 ) -> None:
-    log.info(
-        f"recieved transition: {event}, {source}, {target}, {trigger}, {need}"
-    )
+    log.info(f"recieved transition: {event}, {before}, {after}")
     _transition_gatherer.append(
         {
             'event': event,
-            'source': source,
-            'target': target,
+            'before': before,
+            'after': after,
             'trigger': trigger,
-            'need': need,
+            'guard': guard,
         }
     )
 
@@ -85,11 +83,19 @@ _state_gatherer = []
 
 def state(
     name: str,
-    before: Optional[EventTriggers] = None,
-    after: Optional[EventTriggers] = None,
+    on_entry: Optional[EventTriggers] = None,
+    on_exit: Optional[EventTriggers] = None,
+    machine: Optional['StateMachine'] = None,
 ) -> None:
-    log.info(f"recieved state: {name}, {before}, {before}")
-    _state_gatherer.append({'name': name, 'before': before, 'after': after})
+    log.info(f"recieved state: {name}, {on_entry}, {on_entry}")
+    _state_gatherer.append(
+        {
+            'name': name,
+            'on_entry': on_entry,
+            'on_exit': on_exit,
+            'machine': machine,
+        }
+    )
 
 
 class MetaStateMachine(type):
@@ -114,19 +120,22 @@ class MetaStateMachine(type):
 
         for s in _state_gatherer:
             obj._class_states[str(s['name'])] = State(
-                str(s['name']), s['before'], s['after']
+                name=str(s['name']),
+                on_entry=s['on_entry'],
+                on_exit=s['on_exit'],
+                machine=s['machine'],  # type: ignore
             )
 
         for t in _transition_gatherer:
             transition = Transition(
                 event=str(t['event']),
-                source=[obj._class_states[s] for s in _tuplize(t['source'])],
-                target=obj._class_states[str(t['target'])],
+                before=[obj._class_states[s] for s in _tuplize(t['before'])],
+                after=obj._class_states[str(t['after'])],
                 trigger=t['trigger'],  # type: ignore
-                need=t['need'],  # type: ignore
+                guard=t['guard'],  # type: ignore
             )
             obj._class_transitions.append(transition)
-            setattr(obj, str(t['event']), transition.event_callback())
+            setattr(obj, str(t['event']), transition._event_callback())
 
         _transition_gatherer = []
         _state_gatherer = []
@@ -135,164 +144,167 @@ class MetaStateMachine(type):
 
 class StateMachine(metaclass=MetaStateMachine):
     initial_state: str
-    _states: Dict[str, 'State']
-    _transitions: List['Transition']
+    __states: Dict[str, 'State']
+    __transitions: List['Transition']
 
     def __new__(cls, *args: Any, **kwargs: Any) -> 'StateMachine':
         obj = super(StateMachine, cls).__new__(cls)
-        obj._states = {}
-        obj._transitions = []
+        obj.__states = {}
+        obj.__transitions = []
         return obj
 
-    def __init__(self) -> None:
+    def __init__(self, initial_state: Optional[str] = None) -> None:
         log.info('initializing statemachine')
-        self.__bring_definitions_to_object_level()
-        self._validate_machine_definitions()
-        if callable(self.initial_state):
+        self.__populate_instance()
+        self._validate_machine()
+
+        if initial_state:
+            self.initial_state = initial_state
+        elif callable(self.initial_state):
             self.initial_state = self.initial_state()
-        self._current_state_object = self._state_by_name(self.initial_state)
-        self._current_state_object.run_before(self)
-        self.__create_state_callbacks()
+
+        self.__state = self._get_state(self.initial_state)
+        self.__state.run_on_entry(self)
+        self.__create_state_checks()
         log.info('statemachine initialization complete')
 
     def __getattr__(self, name: str) -> Any:
         try:
             for x in self.transitions:
                 if x.event == name:
-                    return x.event_callback()
+                    return x._event_callback()
             else:
                 raise KeyError
         except KeyError:
             raise AttributeError
 
-    def __bring_definitions_to_object_level(self) -> None:
-        self._states.update(self.__class__._class_states)
-        self._transitions.extend(self.__class__._class_transitions)
+    def __populate_instance(self) -> None:
+        self.__states.update(self.__class__._class_states)
+        self.__transitions.extend(self.__class__._class_transitions)
         log.info('loaded states and transitions')
 
-    def _validate_machine_definitions(self) -> None:
-        if len(self._states) < 2:
+    def _validate_machine(self) -> None:
+        # TODO: empty statemachine should default to null event
+        if len(self.__states) < 2:
             raise FluidstateInvalidConfig('There must be at least two states')
         if not getattr(self, 'initial_state', None):
             raise FluidstateInvalidConfig('There must exist an initial state')
         log.info('validated statemachine')
 
+    @property
+    def transitions(self) -> List['Transition']:
+        return self.__transitions
+
+    @property
+    def states(self) -> List['State']:
+        return list(self.__states.values())
+
+    @property
+    def state(self) -> 'State':
+        return self.__state
+
+    def _update_state(self, state: 'State') -> None:
+        self.__state = state
+        log.info(f"changed state to {state.name}")
+
     def add_state(
         self,
         name: str,
-        before: Optional[EventTriggers] = None,
-        after: Optional[EventTriggers] = None,
+        on_entry: Optional[EventTriggers] = None,
+        on_exit: Optional[EventTriggers] = None,
+        machine: Optional['StateMachine'] = None,
     ) -> None:
-        state = State(name, before, after)
+        state = State(name, on_entry, on_exit, machine)
         setattr(
             self,
             f"is_{state.name}",
             state.callback().__get__(self, self.__class__),
         )
-        self._states[name] = state
+        self.__states[name] = state
         log.info(f"added state {name}")
-
-    @property
-    def current_state(self) -> str:
-        return self._current_state_object.name
-
-    def _new_state(self, state: 'State') -> None:
-        self._current_state_object = state
-        log.info(f"changed state to {state.name}")
-
-    def _state_objects(self) -> List['State']:
-        return list(self._states.values())
-
-    @property
-    def states(self) -> list['State']:
-        return [s for s in self._state_objects()]
-
-    @property
-    def transitions(self) -> List['Transition']:
-        return self._transitions
 
     def add_transition(
         self,
         event: str,
-        source: StateTypes,
-        target: StateType,
+        before: StateTypes,
+        after: StateType,
         trigger: Optional[str] = None,
-        need: Optional[str] = None,
+        guard: Optional[str] = None,
     ) -> None:
         transition = Transition(
             event,
-            [self._state_by_name(s) for s in _tuplize(source)],
-            self._state_by_name(target),
+            [self._get_state(s) for s in _tuplize(before)],
+            self._get_state(after),
             trigger,
-            need,
+            guard,
         )
-        self._transitions.append(transition)
+        self.__transitions.append(transition)
         setattr(
             self,
             event,
-            transition.event_callback().__get__(self, self.__class__),
+            transition._event_callback().__get__(self, self.__class__),
         )
         log.info(f"added transition {event}")
 
     def _process_transitions(
         self, event_name: str, *args: Any, **kwargs: Any
     ) -> None:
-        transitions = self._transitions_by_name(event_name)
-        transitions = self._ensure_source_validity(transitions)
-        this_transition = self._check_needs(transitions)
+        transitions = self._get_transitions(event_name)
+        transitions = self._ensure_before_validity(transitions)
+        this_transition = self._check_guards(transitions)
         this_transition.run(self, *args, **kwargs)
 
-    def __create_state_callbacks(self) -> None:
-        for state in self._state_objects():
+    def __create_state_checks(self) -> None:
+        for state in self.states:
             setattr(
                 self,
                 f"is_{state.name}",
                 state.callback().__get__(self, self.__class__),
             )
 
-    def _state_by_name(self, name: str) -> 'State':
-        for state in self._state_objects():
+    def _get_state(self, name: str) -> 'State':
+        for state in self.states:
             if state.name == name:
                 return state
         raise FluidstateInvalidState(f"state could not be found: {name}")
 
-    def _transitions_by_name(self, name: str) -> List['Transition']:
+    def _get_transitions(self, name: str) -> List['Transition']:
         return list(
             filter(
-                lambda transition: transition.event == name, self._transitions
+                lambda transition: transition.event == name, self.__transitions
             )
         )
 
-    def _ensure_source_validity(
+    def _ensure_before_validity(
         self, transitions: List['Transition']
     ) -> List['Transition']:
         valid_transitions: List['Transition'] = list(
             filter(
-                lambda transition: transition.is_valid_from(
-                    self._current_state_object
-                ),
+                lambda transition: transition.validate(self.__state),
                 transitions,
             )
         )
         if len(valid_transitions) == 0:
             raise FluidstateInvalidTransition(
-                f"Cannot {transitions[0].event} from {self.current_state}"
+                f"Cannot {transitions[0].event} from {self.state}"
             )
         return valid_transitions
 
-    def _check_needs(self, transitions: List['Transition']) -> 'Transition':
+    def _check_guards(self, transitions: List['Transition']) -> 'Transition':
         allowed_transitions = []
         for transition in transitions:
-            if transition.check_need(self):
+            if transition.check_guard(self):
                 allowed_transitions.append(transition)
         if len(allowed_transitions) == 0:
-            raise FluidstateNeedNotSatisfied(
-                "Need is not satisfied for this transition"
+            raise FluidstateGuardNotSatisfied(
+                "Guard is not satisfied for this transition"
             )
         elif len(allowed_transitions) > 1:
             raise FluidstateForkedTransition(
                 "More than one transition was allowed for this event"
             )
+        # XXX: assuming duplicate transition event names are desired then
+        # result should exhaust possible matching before/after transitions
         return allowed_transitions[0]
 
 
@@ -300,34 +312,27 @@ class Transition:
     def __init__(
         self,
         event: str,
-        source: Union['State', List['State']],
-        target: 'State',
+        before: Union['State', List['State']],
+        after: 'State',
         trigger: Optional[EventTrigger] = None,
-        need: Optional[EventTrigger] = None,
+        guard: Optional[EventTrigger] = None,
     ) -> None:
         self.event = event
-        self.source = source
-        self.target = target
+        self.before = before
+        self.after = after
         self.trigger = trigger
-        self.need = Need(need)
+        self.guard = Guard(guard)
 
     def __repr__(self) -> str:
         return repr(
-            "Transition({e}, source={s}, target={t})".format(
+            "Transition({e}, before={s}, after={t})".format(
                 e=self.event,
-                s=self.source,
-                t=self.target,
+                s=self.before,
+                t=self.after,
             )
         )
 
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, Transition):
-            return self.event == other.event
-        elif isinstance(other, str):
-            return self.event == other
-        return False
-
-    def event_callback(self) -> Callable:
+    def _event_callback(self) -> Callable:
         def event(machine, *args, **kwargs):
             machine._process_transitions(self.event, *args, **kwargs)
             log.info(f"processed {self.event}")
@@ -336,16 +341,16 @@ class Transition:
         event.__name__ = self.event
         return event
 
-    def is_valid_from(self, source: 'State') -> bool:
-        return source in _tuplize(self.source)
+    def validate(self, before: 'State') -> bool:
+        return before in _tuplize(self.before)
 
-    def check_need(self, machine: 'StateMachine') -> bool:
-        return self.need.check(machine)
+    def check_guard(self, machine: 'StateMachine') -> bool:
+        return self.guard.check(machine)
 
     def run(self, machine: 'StateMachine', *args: Any, **kwargs: Any) -> None:
-        machine._current_state_object.run_after(machine)
-        machine._new_state(self.target)
-        self.target.run_before(machine)
+        machine.state.run_on_exit(machine)
+        machine._update_state(self.after)
+        self.after.run_on_entry(machine)
         Trigger(machine).run(self.trigger, *args, **kwargs)
         log.info(f"executed trigger event for {self.event}")
 
@@ -354,12 +359,14 @@ class State:
     def __init__(
         self,
         name: str,
-        before: Optional[EventTriggers] = None,
-        after: Optional[EventTriggers] = None,
+        on_entry: Optional[EventTriggers] = None,
+        on_exit: Optional[EventTriggers] = None,
+        machine: Optional['StateMachine'] = None,
     ) -> None:
         self.name = name
-        self.before = before
-        self.after = after
+        self.on_entry = on_entry
+        self.on_exit = on_exit
+        self.machine = machine
 
     def __repr__(self) -> str:
         return repr(f"State({self.name})")
@@ -371,19 +378,31 @@ class State:
             return self.name == other
         return False
 
+    @property
+    def substate(self) -> Optional['State']:
+        if self.machine:
+            return self.machine.state
+        return None
+
     def callback(self) -> Callable:
-        def state_callback(self_machine):
-            return self_machine.current_state == self.name
+        def state_check(machine):
+            return machine.state == self.name
 
-        return state_callback
+        return state_check
 
-    def run_before(self, machine: 'StateMachine') -> None:
-        Trigger(machine).run(self.before)
-        log.info(f"executed 'before' state change trigger for {self.name}")
+    def run_on_entry(self, machine: 'StateMachine') -> None:
+        if self.on_entry is not None:
+            Trigger(machine).run(self.on_entry)
+            log.info(
+                f"executed 'on_entry' state change trigger for {self.name}"
+            )
 
-    def run_after(self, machine: 'StateMachine') -> None:
-        Trigger(machine).run(self.after)
-        log.info(f"executed 'after' state change trigger for {self.name}")
+    def run_on_exit(self, machine: 'StateMachine') -> None:
+        if self.on_exit is not None:
+            Trigger(machine).run(self.on_exit)
+            log.info(
+                f"executed 'on_exit' state change trigger for {self.name}"
+            )
 
 
 class Trigger:
@@ -421,14 +440,14 @@ class Trigger:
             trigger()
 
 
-class Need:
-    def __init__(self, need: Optional[EventTrigger] = None) -> None:
-        self.need = need
+class Guard:
+    def __init__(self, guard: Optional[EventTrigger] = None) -> None:
+        self.guard = guard
 
     def check(self, machine: 'StateMachine') -> bool:
-        if self.need is None:
+        if self.guard is None:
             return True
-        items = _tuplize(self.need)
+        items = _tuplize(self.guard)
         result = True
         for item in items:
             result = result and self.__evaluate(machine, item)
@@ -438,10 +457,10 @@ class Need:
         if callable(item):
             return item(machine)
         else:
-            need = getattr(machine, item)
-            if callable(need):
-                need = need()
-            return need
+            guard = getattr(machine, item)
+            if callable(guard):
+                guard = guard()
+            return guard
 
 
 class FluidstateInvalidConfig(Exception):
@@ -456,7 +475,7 @@ class FluidstateInvalidState(Exception):
     pass
 
 
-class FluidstateNeedNotSatisfied(Exception):
+class FluidstateGuardNotSatisfied(Exception):
     pass
 
 

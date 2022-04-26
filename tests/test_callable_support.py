@@ -1,37 +1,37 @@
 import unittest
 from fluidstate import StateMachine, state, transition
-from fluidstate import FluidstateNeedNotSatisfied
+from fluidstate import FluidstateGuardNotSatisfied
 
 footsteps = []
 
 
 class Foo:
     def bar(self):
-        footsteps.append('after looking')
+        footsteps.append('on_exit looking')
 
 
 foo = Foo()
 
 
-def before_falling_function():
-    footsteps.append('before falling')
+def pre_falling_function():
+    footsteps.append('pre falling')
 
 
 class JumperGuy(StateMachine):
     state(
         'looking',
-        before=lambda jumper: jumper.append('before looking'),
-        after=foo.bar,
+        on_entry=lambda jumper: jumper.append('pre looking'),
+        on_exit=foo.bar,
     )
-    state('falling', before=before_falling_function)
+    state('falling', on_entry=pre_falling_function)
     initial_state = 'looking'
 
     transition(
-        source='looking',
+        before='looking',
         event='jump',
-        target='falling',
+        after='falling',
         trigger=lambda jumper: jumper.append('trigger jump'),
-        need=lambda jumper: jumper.append('need jump') is None,
+        guard=lambda jumper: jumper.append('guard jump') is None,
     )
 
     def __init__(self):
@@ -49,24 +49,24 @@ class CallableSupport(unittest.TestCase):
         assert len(footsteps) == 5
         assert sorted(footsteps) == sorted(
             [
-                'before looking',
-                'after looking',
-                'before falling',
+                'pre looking',
+                'on_exit looking',
+                'pre falling',
                 'trigger jump',
-                'need jump',
+                'guard jump',
             ]
         )
 
-    def test_it_should_deny_state_change_if_need_callable_returns_false(self):
+    def test_it_should_deny_state_change_if_guard_callable_returns_false(self):
         class Door(StateMachine):
             state('open')
             state('closed')
             initial_state = 'closed'
             transition(
-                source='closed',
+                before='closed',
                 event='open',
-                target='open',
-                need=lambda d: not door.locked,
+                after='open',
+                guard=lambda d: not door.locked,
             )
 
             def locked(self):
@@ -74,7 +74,7 @@ class CallableSupport(unittest.TestCase):
 
         door = Door()
         door.locked = True
-        with self.assertRaises(FluidstateNeedNotSatisfied):
+        with self.assertRaises(FluidstateGuardNotSatisfied):
             door.open()
 
 

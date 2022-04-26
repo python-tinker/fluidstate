@@ -9,22 +9,22 @@ class LoanRequest(StateMachine):
     state('accepted')
     initial_state = 'pending'
     transition(
-        source='pending',
+        before='pending',
         event='analyze',
-        target='analyzing',
+        after='analyzing',
         trigger='input_data',
     )
     transition(
-        source='analyzing',
+        before='analyzing',
         event='forward_analysis_result',
-        need='was_loan_accepted',
-        target='accepted',
+        guard='was_loan_accepted',
+        after='accepted',
     )
     transition(
-        source='analyzing',
+        before='analyzing',
         event='forward_analysis_result',
-        need='was_loan_refused',
-        target='refused',
+        guard='was_loan_refused',
+        after='refused',
     )
 
     def input_data(self, accepted=True):
@@ -38,20 +38,20 @@ class LoanRequest(StateMachine):
 
 
 class FluidstateEventSupportsMultipleTransitions(unittest.TestCase):
-    """Event chooses one of multiple transitions, based in their needs"""
+    """Event chooses one of multiple transitions, based in their guards"""
 
-    def test_it_selects_the_transition_having_a_passing_need(self):
+    def test_it_selects_the_transition_having_a_passing_guard(self):
         request = LoanRequest()
         request.analyze()
         request.forward_analysis_result()
-        request.current_state == 'accepted'
+        request.state == 'accepted'
 
         request = LoanRequest()
         request.analyze(accepted=False)
         request.forward_analysis_result()
-        request.current_state == 'refused'
+        request.state == 'refused'
 
-    def test_it_raises_error_if_more_than_one_need_passes(self):
+    def test_it_raises_error_if_more_than_one_guard_passes(self):
         request = LoanRequest()
         request.analyze()
         request.truify = True

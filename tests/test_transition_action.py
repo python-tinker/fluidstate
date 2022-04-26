@@ -8,9 +8,9 @@ class CrazyGuy(StateMachine):
     state('falling')
     initial_state = 'looking'
     transition(
-        source='looking',
+        before='looking',
         event='jump',
-        target='falling',
+        after='falling',
         trigger=['become_at_risk', 'accelerate'],
     )
 

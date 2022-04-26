@@ -1,7 +1,7 @@
 import unittest
 
 from fluidstate import StateMachine, state, transition
-from fluidstate import FluidstateNeedNotSatisfied
+from fluidstate import FluidstateGuardNotSatisfied
 
 
 class FallingMachine(StateMachine):
@@ -9,10 +9,10 @@ class FallingMachine(StateMachine):
     state('falling')
     initial_state = 'looking'
     transition(
-        source='looking',
+        before='looking',
         event='jump',
-        target='falling',
-        need=['ready_to_fly', 'high_enough'],
+        after='falling',
+        guard=['ready_to_fly', 'high_enough'],
     )
 
     def __init__(self, ready=True):
@@ -27,25 +27,25 @@ class FallingMachine(StateMachine):
         return self.high_enough_flag
 
 
-class FluidstateNeed(unittest.TestCase):
+class FluidstateGuard(unittest.TestCase):
     def test_it_allows_transition_if_satisfied(self):
         machine = FallingMachine()
         try:
             machine.jump()
         except Exception:
             self.fail('machine failed to jump')
-        assert machine.current_state == 'falling'
+        assert machine.state == 'falling'
 
     def test_it_forbids_transition_if_not_satisfied(self):
         machine = FallingMachine(ready=False)
-        with self.assertRaises(FluidstateNeedNotSatisfied):
+        with self.assertRaises(FluidstateGuardNotSatisfied):
             machine.jump()
 
     def test_it_may_be_an_attribute(self):
         """it may be an attribute, not only a method"""
         machine = FallingMachine()
         machine.ready_to_fly = False
-        with self.assertRaises(FluidstateNeedNotSatisfied):
+        with self.assertRaises(FluidstateGuardNotSatisfied):
             machine.jump()
 
         machine.ready_to_fly = True
@@ -53,7 +53,7 @@ class FluidstateNeed(unittest.TestCase):
             machine.jump()
         except Exception:
             self.fail('machine jump failed')
-        assert machine.current_state == 'falling'
+        assert machine.state == 'falling'
 
     def test_it_allows_transition_only_if_all_are_satisfied(self):
         machine = FallingMachine()
@@ -67,13 +67,13 @@ class FluidstateNeed(unittest.TestCase):
         machine = FallingMachine()
         machine.ready_to_fly = False
         machine.high_enough_flag = True
-        with self.assertRaises(FluidstateNeedNotSatisfied):
+        with self.assertRaises(FluidstateGuardNotSatisfied):
             machine.jump()
 
         machine = FallingMachine()
         machine.ready_to_fly = True
         machine.high_enough_flag = False
-        with self.assertRaises(FluidstateNeedNotSatisfied):
+        with self.assertRaises(FluidstateGuardNotSatisfied):
             machine.jump()
 
 

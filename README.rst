@@ -20,9 +20,9 @@ A very simple example taken from specs::
          state('processed')
          state('canceled')
 
-         transition(source='created', event='queue', target='waiting')
-         transition(source='waiting', event='process', target='processed')
-         transition(source=['waiting', 'created'], event='cancel', target='canceled')
+         transition(before='created', event='queue', after='waiting')
+         transition(before='waiting', event='process', after='processed')
+         transition(before=['waiting', 'created'], event='cancel', after='canceled')
 
 
 "A slightly more complex example"
@@ -37,15 +37,15 @@ For demonstrating more advanced capabilities::
                 lambda relationship: relationship.strictly_for_fun() and 'intimate' or 'dating'
             )
 
-            state('dating', before='make_happy', after='make_depressed')
-            state('intimate', before='make_very_happy', after='never_speak_again')
-            state('married', before='give_up_intimacy', after='buy_exotic_car')
+            state('dating', on_entry='make_happy', on_exit='make_depressed')
+            state('intimate', on_entry='make_very_happy', on_exit='never_speak_again')
+            state('married', on_entry='give_up_intimacy', on_exit='buy_exotic_car')
 
-            transition(source='dating', event='get_intimate', target='intimate', need='drunk')
+            transition(before='dating', event='get_intimate', after='intimate', need='drunk')
             transition(
-                source=['dating', 'intimate'],
+                before=['dating', 'intimate'],
                 event='get_married',
-                target='married',
+                after='married',
                 need='willing_to_give_up_manhood'
             )
 
@@ -82,8 +82,8 @@ States
 
 A Fluidstate state machine must have one initial state and at least one other additional state.
 
-A state may have before and after callbacks, for running some code on state *before*
-and *after*, respectively. These params can be method names (as strings),
+A state may have pre and post callbacks, for running some code on state *on_entry*
+and *on_exit*, respectively. These params can be method names (as strings),
 callables, or lists of method names or callables.
 
 
@@ -91,8 +91,8 @@ Transitions
 -----------
 
 Transitions lead the machine from a state to another. Transitions must have
-*source*, *target*, and *event* parameters. *source* is one or more (as list) states
-from which the transition can be beforeed. *target* is the state to which the
+*before*, *after*, and *event* parameters. *before* is one or more (as list) states
+from which the transition can be preed. *after* is the state to which the
 transition will lead the machine. *event* is the method that have to be called
 to launch the transition. This method is automatically created by the Fluidstate
 engine.
@@ -117,10 +117,10 @@ states and transitions for individual objects. For example, having "door" as a
 state machine::
 
     door.add_state('broken')
-    door.add_transition(event='crack', source='closed', target='broken')
+    door.add_transition(event='crack', before='closed', after='broken')
 
 
-These additions only affect the target object.
+These additions only affect the after object.
 
 
 Install

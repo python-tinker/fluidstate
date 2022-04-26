@@ -1,0 +1,57 @@
+# Considering
+
+## Dynamic states / transitions
+
+Current class declarations cannot be configurable by other instances
+
+Example:
+
+class ConvenienceMartDoorMachine(StateMachine):
+    states: List['State'] = [
+        State('closed')
+        State('opened', after='ring_bell')
+    ]
+    transitions: List['Transitions'] = [
+        Transition['open_door', source='closed', target='opened')
+        Transition['close_door', source='opened', target='closed')
+    ]
+
+
+
+class Intersection(StateMachine):
+    states: List['State'] = [
+        State('operational')
+        State('off')
+    ]
+    transitions: List['Transitions'] = [
+        Transition['enable_intersection', source='off', target='operational')
+        Transition['disable_intersection', source='operational', target='off')
+    ]
+
+
+class IntersectionCrossing(Intersection):
+    states: List['State'] = [
+        State('vechicles_enabled'),
+        State('pedestrians_enabled'),
+    ]
+    transitions: List['Transition'] = [
+    ]
+
+
+## State attribute naming cannot use entry/exit
+
+entry/exit:
+  - pre/post
+  - ingress/egress
+  - on_entry/on_exit
+  - entering/exiting
+  - start/finish
+
+## Transition attribute naming
+
+from/to:
+  - before/after
+  - former/latter
+  - origin/dest
+  - source/target
+  - left/right
