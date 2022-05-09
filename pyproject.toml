@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "fluidstate"
-version = "1.0.0b0"
+version = "1.0.0b1"
 repository = "https://github.com/kuwv/python-fluidstate"
 description = "Compact state machine in Python that can be vendored."
 authors = ["Jesse P. Johnson <jpj6652@gmail.com>"]
