@@ -1,5 +1,3 @@
-# The MIT License
-#
 # Copyright (c) 2022 Jesse P. Johnson
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -118,6 +116,7 @@ class MetaStateMachine(type):
         obj._class_transitions = []
         obj._class_states = {}
 
+        # TODO: create slots from here
         for s in _state_gatherer:
             obj._class_states[str(s['name'])] = State(
                 name=str(s['name']),
@@ -146,6 +145,8 @@ class StateMachine(metaclass=MetaStateMachine):
     initial_state: str
     __states: Dict[str, 'State']
     __transitions: List['Transition']
+    # NOTE: need '__dict__' to allow modification to states/transitions
+    # __slots__ = ['initial_state', '__states', '__transitions', '__dict__']
 
     def __new__(cls, *args: Any, **kwargs: Any) -> 'StateMachine':
         obj = super(StateMachine, cls).__new__(cls)
@@ -304,11 +305,13 @@ class StateMachine(metaclass=MetaStateMachine):
                 "More than one transition was allowed for this event"
             )
         # XXX: assuming duplicate transition event names are desired then
-        # result should exhaust possible matching before/after transitions
+        # result should exhaust possible matching guard transitions
         return allowed_transitions[0]
 
 
 class Transition:
+    __slots__ = ['event', 'before', 'after', 'trigger', 'guard']
+
     def __init__(
         self,
         event: str,
@@ -356,6 +359,8 @@ class Transition:
 
 
 class State:
+    __slots__ = ['name', 'on_entry', 'on_exit', 'machine']
+
     def __init__(
         self,
         name: str,
@@ -406,6 +411,8 @@ class State:
 
 
 class Trigger:
+    __slots__ = ['machine']
+
     def __init__(self, machine: 'StateMachine') -> None:
         self.machine = machine
 
@@ -431,8 +438,9 @@ class Trigger:
                 getattr(self.machine, trigger), *args, **kwargs
             )
 
+    @staticmethod
     def __try_to_run_with_args(
-        self, trigger: Callable, *args: Any, **kwargs: Any
+        trigger: Callable, *args: Any, **kwargs: Any
     ) -> None:
         try:
             trigger(*args, **kwargs)
@@ -441,19 +449,22 @@ class Trigger:
 
 
 class Guard:
-    def __init__(self, guard: Optional[EventTrigger] = None) -> None:
-        self.guard = guard
+    __slots__ = ['rule']
+
+    def __init__(self, rule: Optional[EventTrigger] = None) -> None:
+        self.rule = rule
 
     def check(self, machine: 'StateMachine') -> bool:
-        if self.guard is None:
+        if self.rule is None:
             return True
-        items = _tuplize(self.guard)
+        items = _tuplize(self.rule)
         result = True
         for item in items:
             result = result and self.__evaluate(machine, item)
         return result
 
-    def __evaluate(self, machine: 'StateMachine', item: EventTrigger) -> bool:
+    @staticmethod
+    def __evaluate(machine: 'StateMachine', item: EventTrigger) -> bool:
         if callable(item):
             return item(machine)
         else:
