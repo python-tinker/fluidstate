@@ -1,40 +1,41 @@
 import unittest
-from fluidstate import StateMachine, state, FluidstateInvalidConfig
+
+from fluidstate import InvalidConfig, StateMachine, state
 
 
-class FluidstateConfigurationValidation(unittest.TestCase):
+class ConfigurationValidation(unittest.TestCase):
     def test_it_requires_at_least_two_states(self):
         class MyMachine(StateMachine):
             pass
 
-        with self.assertRaises(FluidstateInvalidConfig):
+        with self.assertRaises(InvalidConfig):
             MyMachine()
-            # FluidstateInvalidConfig, message="There must be at least two states"
+            # InvalidConfig, message="There must be at least two states"
 
         class OtherMachine(StateMachine):
             state('open')
 
-        with self.assertRaises(FluidstateInvalidConfig):
+        with self.assertRaises(InvalidConfig):
             OtherMachine()
-            # FluidstateInvalidConfig, message="There must be at least two states"
+            # InvalidConfig, message="There must be at least two states"
 
     def test_it_requires_an_initial_state(self):
         class MyMachine(StateMachine):
             state('open')
             state('closed')
 
-        with self.assertRaises(FluidstateInvalidConfig):
+        with self.assertRaises(InvalidConfig):
             MyMachine()
-            # FluidstateInvalidConfig, message="There must be at least two states"
+            # InvalidConfig, message="There must be at least two states"
 
         class AnotherMachine(StateMachine):
             state('open')
             state('closed')
             initial_state = None
 
-        with self.assertRaises(FluidstateInvalidConfig):
+        with self.assertRaises(InvalidConfig):
             AnotherMachine()
-            # FluidstateInvalidConfig, message="There must exist an initial state"
+            # InvalidConfig, message="There must exist an initial state"
 
 
 if __name__ == '__main__':

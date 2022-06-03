@@ -21,16 +21,7 @@
 """Compact state machine that can be vendored."""
 
 import logging
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    Iterable,
-    List,
-    Optional,
-    Tuple,
-    Union,
-)
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 __author__ = 'Jesse P. Johnson'
 __author_email__ = 'jpj6652@gmail.com'
@@ -50,11 +41,11 @@ StateType = str
 StateTypes = Union[StateType, Iterable[StateType]]
 
 
-def _tuplize(value):
+def _tuplize(value: Any) -> Tuple[Any, ...]:
     return tuple(value) if type(value) in [list, tuple] else (value,)
 
 
-_transition_gatherer = []
+_transition_gatherer: List[Dict[str, Any]] = []
 
 
 def transition(
@@ -76,7 +67,7 @@ def transition(
     )
 
 
-_state_gatherer = []
+_state_gatherer: List[Dict[str, Any]] = []
 
 
 def state(
@@ -145,8 +136,7 @@ class StateMachine(metaclass=MetaStateMachine):
     initial_state: str
     __states: Dict[str, 'State']
     __transitions: List['Transition']
-    # NOTE: need '__dict__' to allow modification to states/transitions
-    # __slots__ = ['initial_state', '__states', '__transitions', '__dict__']
+    __slots__ = ['initial_state', '__states', '__transitions', '__dict__']
 
     def __new__(cls, *args: Any, **kwargs: Any) -> 'StateMachine':
         obj = super(StateMachine, cls).__new__(cls)
@@ -187,9 +177,9 @@ class StateMachine(metaclass=MetaStateMachine):
     def _validate_machine(self) -> None:
         # TODO: empty statemachine should default to null event
         if len(self.__states) < 2:
-            raise FluidstateInvalidConfig('There must be at least two states')
+            raise InvalidConfig('There must be at least two states')
         if not getattr(self, 'initial_state', None):
-            raise FluidstateInvalidConfig('There must exist an initial state')
+            raise InvalidConfig('There must exist an initial state')
         log.info('validated statemachine')
 
     @property
@@ -267,7 +257,7 @@ class StateMachine(metaclass=MetaStateMachine):
         for state in self.states:
             if state.name == name:
                 return state
-        raise FluidstateInvalidState(f"state could not be found: {name}")
+        raise InvalidState(f"state could not be found: {name}")
 
     def _get_transitions(self, name: str) -> List['Transition']:
         return list(
@@ -286,7 +276,7 @@ class StateMachine(metaclass=MetaStateMachine):
             )
         )
         if len(valid_transitions) == 0:
-            raise FluidstateInvalidTransition(
+            raise InvalidTransition(
                 f"Cannot {transitions[0].event} from {self.state}"
             )
         return valid_transitions
@@ -297,11 +287,11 @@ class StateMachine(metaclass=MetaStateMachine):
             if transition.check_guard(self):
                 allowed_transitions.append(transition)
         if len(allowed_transitions) == 0:
-            raise FluidstateGuardNotSatisfied(
+            raise GuardNotSatisfied(
                 'Guard is not satisfied for this transition'
             )
         elif len(allowed_transitions) > 1:
-            raise FluidstateForkedTransition(
+            raise ForkedTransition(
                 'More than one transition was allowed for this event'
             )
         # XXX: assuming duplicate transition event names are desired then
@@ -474,21 +464,25 @@ class Guard:
             return guard
 
 
-class FluidstateInvalidConfig(Exception):
+class FluidstateException(Exception):
     pass
 
 
-class FluidstateInvalidTransition(Exception):
+class InvalidConfig(FluidstateException):
     pass
 
 
-class FluidstateInvalidState(Exception):
+class InvalidTransition(FluidstateException):
     pass
 
 
-class FluidstateGuardNotSatisfied(Exception):
+class InvalidState(FluidstateException):
     pass
 
 
-class FluidstateForkedTransition(Exception):
+class GuardNotSatisfied(FluidstateException):
+    pass
+
+
+class ForkedTransition(FluidstateException):
     pass

@@ -1,7 +1,6 @@
 import unittest
 
-from fluidstate import StateMachine, state, transition
-from fluidstate import FluidstateInvalidTransition
+from fluidstate import InvalidTransition, StateMachine, state, transition
 
 
 class MyMachine(StateMachine):
@@ -34,11 +33,11 @@ class FluidstateEvent(unittest.TestCase):
 
     def test_it_ensures_event_order(self):
         machine = MyMachine()
-        with self.assertRaises(FluidstateInvalidTransition):
+        with self.assertRaises(InvalidTransition):
             machine.process()
 
         machine.queue()
-        with self.assertRaises(FluidstateInvalidTransition):
+        with self.assertRaises(InvalidTransition):
             machine.queue()
         try:
             machine.process

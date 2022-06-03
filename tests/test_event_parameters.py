@@ -1,4 +1,5 @@
 import unittest
+
 from fluidstate import StateMachine, state, transition
 
 
