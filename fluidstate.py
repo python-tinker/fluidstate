@@ -298,11 +298,11 @@ class StateMachine(metaclass=MetaStateMachine):
                 allowed_transitions.append(transition)
         if len(allowed_transitions) == 0:
             raise FluidstateGuardNotSatisfied(
-                "Guard is not satisfied for this transition"
+                'Guard is not satisfied for this transition'
             )
         elif len(allowed_transitions) > 1:
             raise FluidstateForkedTransition(
-                "More than one transition was allowed for this event"
+                'More than one transition was allowed for this event'
             )
         # XXX: assuming duplicate transition event names are desired then
         # result should exhaust possible matching guard transitions
