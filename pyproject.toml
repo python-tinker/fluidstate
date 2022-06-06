@@ -1,41 +1,51 @@
-[tool.poetry]
+[project]
 name = "fluidstate"
 version = "1.0.0b1"
-repository = "https://github.com/kuwv/python-fluidstate"
 description = "Compact state machine in Python that can be vendored."
-authors = ["Jesse P. Johnson <jpj6652@gmail.com>"]
-license = "MIT"
 readme = "README.rst"
-classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.6",
-    "Programming Language :: Python :: 3.7",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Topic :: Software Development :: Libraries"
-]
+license = {file = "LICENSE"}
 keywords = ["state machine", "dsl"]
-include = ["CHANGELOG", "LICENSE", "*.rst"]
+requires-python = ">=3.6.2"
+authors = [{name = "Jesse P. Johnson", email = "jpj6652@gmail.com"}]
+maintainers = [{name = "Jesse P. Johnson", email = "jpj6652@gmail.com"}]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.6",
+  "Programming Language :: Python :: 3.7",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Topic :: Software Development :: Libraries"
+]
 
-[tool.poetry.dependencies]
-python = "^3.6.2"
+[project.urls]
+repository = "https://github.com/kuwv/python-fluidstate"
 
-[tool.poetry.dev-dependencies]
-tox = "^3.25.0"
-black = "^22.3.0"
-mypy = "^0.942"
-isort = "^5.10.1"
-flake8 = "^3.8.3"
-docstr-coverage = "^1.2.0"
-bandit = "^1.6.2"
-pylint = "^2.9.5"
-mkdocstrings = "^0.16.2"
-proman-versioning = "^0.5.0-alpha.2"
+[project.optional-dependencies]
+build = [
+  "build",
+  "proman-versioning>=0.5.0-alpha.2"
+]
+docs = [
+  "docstr-coverage>=1.2.0",
+]
+test = [
+  "tox>=3.25.0",
+]
+sca = [
+  "mypy>=0.942",
+  "bandit>=1.6.2",
+  # "pylint>=2.9.5"
+]
+style = [
+  "black==22.3.0",
+  "isort>=5.10.1",
+  "flake8>=3.8.3",
+]
 
 [tool.proman.versioning]
 enable_devreleases = false
@@ -54,9 +64,8 @@ pattern = "version = \"${version}\""
 
 [tool.pydocstyle]
 ignore = [
-    "D203",
-    "D213",
-    "D300"
+  "D203",
+  "D213"
 ]
 
 [tool.isort]
@@ -81,5 +90,5 @@ exclude = '''
 '''
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["setuptools>=61.0.0"]
+build-backend = "setuptools.build_meta"
