@@ -16,21 +16,18 @@ class StopLight(StateMachine):
 
     transition(
         'turn_green',
-        before='red',
-        after='green',
-        trigger=lambda: time.sleep(5),
+        target='green',
+        action=lambda: time.sleep(5),
     )
     transition(
         'turn_yellow',
-        before='green',
-        after='yellow',
-        trigger=lambda: time.sleep(2),
+        target='yellow',
+        action=lambda: time.sleep(2),
     )
     transition(
         'turn_red',
-        before='yellow',
-        after='red',
-        trigger=lambda: time.sleep(5),
+        target='red',
+        action=lambda: time.sleep(5),
     )
 
 
@@ -48,15 +45,13 @@ class Intersection(StateMachine):
 
     transition(
         event='allow_north_south',
-        before='east_west',
-        after='north_south',
-        trigger='_change_green',
+        target='north_south',
+        action='_change_green',
     )
     transition(
         event='allow_east_west',
-        before='north_south',
-        after='east_west',
-        trigger='_change_green',
+        target='east_west',
+        action='_change_green',
     )
 
     def _change_red(self) -> None:

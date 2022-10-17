@@ -1,33 +1,26 @@
 import unittest
 
-from fluidstate import StateMachine, state, transition
+from fluidstate import StateChart, state, transition
 
 
-class Door(StateMachine):
+class Door(StateChart):
     state('closed')
     state('open')
     initial_state = 'closed'
-    transition(
-        before='closed', event='open', after='open', trigger='open_trigger'
-    )
-    transition(
-        before='open',
-        event='close',
-        after='closed',
-        trigger='close_trigger',
-    )
+    transition(event='open', target='open', action='open_action')
+    transition(event='close', target='closed', action='close_action')
 
-    def open_trigger(self, when, where):
+    def open_action(self, when, where):
         self.when = when
         self.where = where
 
-    def close_trigger(self, *args, **kwargs):
+    def close_action(self, *args, **kwargs):
         self.args = args
         self.kwargs = kwargs
 
 
 class EventParameters(unittest.TestCase):
-    def test_it_pass_parameters_received_by_event_to_trigger(self):
+    def test_it_pass_parameters_received_by_event_to_action(self):
         door = Door()
         door.open('now!', 'there!')
         assert hasattr(door, 'when')
@@ -35,7 +28,7 @@ class EventParameters(unittest.TestCase):
         assert hasattr(door, 'where')
         assert door.where == 'there!'
 
-    def test_it_pass_args_and_kwargs_to_trigger(self):
+    def test_it_pass_args_and_kwargs_to_action(self):
         door = Door()
         door.open('anytime', 'anywhere')
         door.close('1', 2, object, test=9, it=8, works=7)

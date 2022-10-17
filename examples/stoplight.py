@@ -16,21 +16,18 @@ class StopLight(StateMachine):
 
     transition(
         'turn_green',
-        before='red',
-        after='green',
-        trigger=lambda: time.sleep(5),
+        target='green',
+        action=lambda: time.sleep(5),
     )
     transition(
         'turn_yellow',
-        before='green',
-        after='yellow',
-        trigger=lambda: time.sleep(5),
+        target='yellow',
+        action=lambda: time.sleep(5),
     )
     transition(
         'turn_red',
-        before='yellow',
-        after='red',
-        trigger=lambda: time.sleep(5),
+        target='red',
+        action=lambda: time.sleep(5),
     )
 
 

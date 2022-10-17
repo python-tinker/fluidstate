@@ -1,13 +1,13 @@
 import unittest
 
-from fluidstate import StateMachine, state, transition
+from fluidstate import StateChart, state, transition
 
 
-class Door(StateMachine):
+class Door(StateChart):
     state('closed')
     state('open')
     initial_state = 'closed'
-    transition(before='closed', event='open', after='open')
+    transition(event='open', target='open')
 
 
 class IndividuationSpec(unittest.TestCase):
@@ -16,9 +16,7 @@ class IndividuationSpec(unittest.TestCase):
     def setUp(self):
         self.door = Door()
         self.door.add_state('broken')
-        self.door.add_transition(
-            before='closed', event='crack', after='broken'
-        )
+        self.door.add_transition(event='crack', target='broken')
 
     def test_it_responds_to_an_event(self):
         assert hasattr(self.door, 'crack')
@@ -31,7 +29,7 @@ class IndividuationSpec(unittest.TestCase):
         assert len(self.door.states) == 3
         assert self.door.states == ['closed', 'open', 'broken']
 
-    def test_its_individuation_does_not_affect_other_objects_beforethe_same_class(
+    def test_individuation_does_not_affect_other_objects_before_same_class(
         self,
     ):
         another_door = Door()

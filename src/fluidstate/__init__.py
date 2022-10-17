@@ -30,13 +30,15 @@ __description__ = 'Compact state machine that can be vendored.'
 __version__ = '1.0.0b1'
 __license__ = 'MIT'
 __copyright__ = 'Copyright 2022 Jesse Johnson.'
-__all__ = ('StateMachine', 'state', 'transition')
+__all__ = ('StateChart', 'state', 'transition')
 
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
-EventTrigger = Union[str, Callable]
-EventTriggers = Union[EventTrigger, Iterable[EventTrigger]]
+EventAction = Union[str, Callable]
+EventActions = Union[EventAction, Iterable[EventAction]]
+GuardCondition = Union[str, Callable]
+GuardConditions = Union[GuardCondition, Iterable[GuardCondition]]
 StateType = str
 StateTypes = Union[StateType, Iterable[StateType]]
 
@@ -50,19 +52,17 @@ _transition_gatherer: List[Dict[str, Any]] = []
 
 def transition(
     event: str,
-    before: StateTypes,
-    after: StateType,
-    trigger: Optional[EventTriggers] = None,
-    guard: Optional[EventTriggers] = None,
+    target: StateType,
+    action: Optional[EventActions] = None,
+    cond: Optional[GuardConditions] = None,
 ) -> None:
-    log.info(f"recieved transition: {event}, {before}, {after}")
+    log.info(f"recieved transition: {event}, {cond}, {target}")
     _transition_gatherer.append(
         {
             'event': event,
-            'before': before,
-            'after': after,
-            'trigger': trigger,
-            'guard': guard,
+            'target': target,
+            'action': action,
+            'cond': cond,
         }
     )
 
@@ -72,9 +72,9 @@ _state_gatherer: List[Dict[str, Any]] = []
 
 def state(
     name: str,
-    on_entry: Optional[EventTriggers] = None,
-    on_exit: Optional[EventTriggers] = None,
-    machine: Optional['StateMachine'] = None,
+    on_entry: Optional[EventActions] = None,
+    on_exit: Optional[EventActions] = None,
+    machine: Optional['StateChart'] = None,
 ) -> None:
     log.info(f"recieved state: {name}, {on_entry}, {on_entry}")
     _state_gatherer.append(
@@ -87,7 +87,7 @@ def state(
     )
 
 
-class MetaStateMachine(type):
+class MetaStateChart(type):
     _class_states: Dict[str, 'State']
     _class_transitions: List['Transition']
 
@@ -96,14 +96,14 @@ class MetaStateMachine(type):
         name: str,
         bases: Tuple[type, ...],
         attrs: Dict[str, Any],
-    ) -> 'MetaStateMachine':
+    ) -> 'MetaStateChart':
         # if 'logging_enabled' in kwargs and kwargs.get('logging_enabled'):
         #     for handler in log.handlers[:]:
         #         log.removeHandler(handler)
         #     log.addHandler(logging.StreamHandler())
 
         global _transition_gatherer, _state_gatherer
-        obj = super(MetaStateMachine, cls).__new__(cls, name, bases, attrs)
+        obj = super(MetaStateChart, cls).__new__(cls, name, bases, attrs)
         obj._class_transitions = []
         obj._class_states = {}
 
@@ -119,10 +119,9 @@ class MetaStateMachine(type):
         for t in _transition_gatherer:
             transition = Transition(
                 event=str(t['event']),
-                before=[obj._class_states[s] for s in _tuplize(t['before'])],
-                after=obj._class_states[str(t['after'])],
-                trigger=t['trigger'],  # type: ignore
-                guard=t['guard'],  # type: ignore
+                target=str(t['target']),
+                action=t['action'],  # type: ignore
+                cond=t['cond'],  # type: ignore
             )
             obj._class_transitions.append(transition)
             setattr(obj, str(t['event']), transition._event_callback())
@@ -132,14 +131,14 @@ class MetaStateMachine(type):
         return obj
 
 
-class StateMachine(metaclass=MetaStateMachine):
+class StateChart(metaclass=MetaStateChart):
     initial_state: str
     __states: Dict[str, 'State']
     __transitions: List['Transition']
     __slots__ = ['initial_state', '__states', '__transitions', '__dict__']
 
-    def __new__(cls, *args: Any, **kwargs: Any) -> 'StateMachine':
-        obj = super(StateMachine, cls).__new__(cls)
+    def __new__(cls, *args: Any, **kwargs: Any) -> 'StateChart':
+        obj = super(StateChart, cls).__new__(cls)
         obj.__states = {}
         obj.__transitions = []
         return obj
@@ -194,16 +193,16 @@ class StateMachine(metaclass=MetaStateMachine):
     def state(self) -> 'State':
         return self.__state
 
-    def _update_state(self, state: 'State') -> None:
-        self.__state = state
-        log.info(f"changed state to {state.name}")
+    def _update_state(self, state: str) -> None:
+        self.__state = self._get_state(state)
+        log.info(f"changed state to {state}")
 
     def add_state(
         self,
         name: str,
-        on_entry: Optional[EventTriggers] = None,
-        on_exit: Optional[EventTriggers] = None,
-        machine: Optional['StateMachine'] = None,
+        on_entry: Optional[EventActions] = None,
+        on_exit: Optional[EventActions] = None,
+        machine: Optional['StateChart'] = None,
     ) -> None:
         state = State(name, on_entry, on_exit, machine)
         setattr(
@@ -217,17 +216,15 @@ class StateMachine(metaclass=MetaStateMachine):
     def add_transition(
         self,
         event: str,
-        before: StateTypes,
-        after: StateType,
-        trigger: Optional[str] = None,
-        guard: Optional[str] = None,
+        target: StateType,
+        action: Optional[str] = None,
+        cond: Optional[str] = None,
     ) -> None:
         transition = Transition(
-            event,
-            [self._get_state(s) for s in _tuplize(before)],
-            self._get_state(after),
-            trigger,
-            guard,
+            event=event,
+            target=target,
+            action=action,
+            cond=cond,
         )
         self.__transitions.append(transition)
         setattr(
@@ -238,10 +235,9 @@ class StateMachine(metaclass=MetaStateMachine):
         log.info(f"added transition {event}")
 
     def _process_transitions(
-        self, event_name: str, *args: Any, **kwargs: Any
+        self, event: str, *args: Any, **kwargs: Any
     ) -> None:
-        transitions = self._get_transitions(event_name)
-        transitions = self._ensure_before_validity(transitions)
+        transitions = self._get_transitions(event)
         this_transition = self._check_guards(transitions)
         this_transition.run(self, *args, **kwargs)
 
@@ -266,21 +262,6 @@ class StateMachine(metaclass=MetaStateMachine):
             )
         )
 
-    def _ensure_before_validity(
-        self, transitions: List['Transition']
-    ) -> List['Transition']:
-        valid_transitions: List['Transition'] = list(
-            filter(
-                lambda transition: transition.validate(self.__state),
-                transitions,
-            )
-        )
-        if len(valid_transitions) == 0:
-            raise InvalidTransition(
-                f"Cannot {transitions[0].event} from {self.state}"
-            )
-        return valid_transitions
-
     def _check_guards(self, transitions: List['Transition']) -> 'Transition':
         allowed_transitions = []
         for transition in transitions:
@@ -300,29 +281,23 @@ class StateMachine(metaclass=MetaStateMachine):
 
 
 class Transition:
-    __slots__ = ['event', 'before', 'after', 'trigger', 'guard']
+    __slots__ = ['event', 'target', 'action', 'cond']
 
     def __init__(
         self,
         event: str,
-        before: Union['State', List['State']],
-        after: 'State',
-        trigger: Optional[EventTrigger] = None,
-        guard: Optional[EventTrigger] = None,
+        target: str,
+        action: Optional[EventActions] = None,
+        cond: Optional[GuardConditions] = None,
     ) -> None:
         self.event = event
-        self.before = before
-        self.after = after
-        self.trigger = trigger
-        self.guard = Guard(guard)
+        self.target = target
+        self.action = action
+        self.cond = cond
 
     def __repr__(self) -> str:
         return repr(
-            "Transition({e}, before={s}, after={t})".format(
-                e=self.event,
-                s=self.before,
-                t=self.after,
-            )
+            "Transition({e}, target={t})".format(e=self.event, t=self.target)
         )
 
     def _event_callback(self) -> Callable:
@@ -334,18 +309,15 @@ class Transition:
         event.__name__ = self.event
         return event
 
-    def validate(self, before: 'State') -> bool:
-        return before in _tuplize(self.before)
+    def check_guard(self, machine: 'StateChart') -> bool:
+        return Guard(machine).check(self.cond) if self.cond else True
 
-    def check_guard(self, machine: 'StateMachine') -> bool:
-        return self.guard.check(machine)
-
-    def run(self, machine: 'StateMachine', *args: Any, **kwargs: Any) -> None:
+    def run(self, machine: 'StateChart', *args: Any, **kwargs: Any) -> None:
         machine.state.run_on_exit(machine)
-        machine._update_state(self.after)
-        self.after.run_on_entry(machine)
-        Trigger(machine).run(self.trigger, *args, **kwargs)
-        log.info(f"executed trigger event for {self.event}")
+        machine._update_state(self.target)
+        machine._get_state(self.target).run_on_entry(machine)
+        Action(machine).run(self.action, *args, **kwargs)
+        log.info(f"executed action event for {self.event}")
 
 
 class State:
@@ -354,9 +326,9 @@ class State:
     def __init__(
         self,
         name: str,
-        on_entry: Optional[EventTriggers] = None,
-        on_exit: Optional[EventTriggers] = None,
-        machine: Optional['StateMachine'] = None,
+        on_entry: Optional[EventActions] = None,
+        on_exit: Optional[EventActions] = None,
+        machine: Optional['StateChart'] = None,
     ) -> None:
         self.name = name
         self.on_entry = on_entry
@@ -385,76 +357,72 @@ class State:
 
         return state_check
 
-    def run_on_entry(self, machine: 'StateMachine') -> None:
+    def run_on_entry(self, machine: 'StateChart') -> None:
         if self.on_entry is not None:
-            Trigger(machine).run(self.on_entry)
+            Action(machine).run(self.on_entry)
             log.info(
-                f"executed 'on_entry' state change trigger for {self.name}"
+                f"executed 'on_entry' state change action for {self.name}"
             )
 
-    def run_on_exit(self, machine: 'StateMachine') -> None:
+    def run_on_exit(self, machine: 'StateChart') -> None:
         if self.on_exit is not None:
-            Trigger(machine).run(self.on_exit)
-            log.info(
-                f"executed 'on_exit' state change trigger for {self.name}"
-            )
+            Action(machine).run(self.on_exit)
+            log.info(f"executed 'on_exit' state change action for {self.name}")
 
 
-class Trigger:
+class Action:
     __slots__ = ['machine']
 
-    def __init__(self, machine: 'StateMachine') -> None:
+    def __init__(self, machine: 'StateChart') -> None:
         self.machine = machine
 
     def run(
         self,
-        trigger_param: Optional[EventTriggers] = None,
+        action_param: Optional[EventActions] = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        if not trigger_param:
+        if not action_param:
             return
-        trigger_items = _tuplize(trigger_param)
-        for trigger_item in trigger_items:
-            self._run_trigger(trigger_item, *args, **kwargs)
+        action_items = _tuplize(action_param)
+        for action_item in action_items:
+            self._run_action(action_item, *args, **kwargs)
 
-    def _run_trigger(
-        self, trigger: EventTrigger, *args: Any, **kwargs: Any
+    def _run_action(
+        self, action: EventAction, *args: Any, **kwargs: Any
     ) -> None:
-        if callable(trigger):
-            self.__try_to_run_with_args(trigger, self.machine, *args, **kwargs)
+        if callable(action):
+            self.__try_to_run_with_args(action, self.machine, *args, **kwargs)
         else:
             self.__try_to_run_with_args(
-                getattr(self.machine, trigger), *args, **kwargs
+                getattr(self.machine, action), *args, **kwargs
             )
 
     @staticmethod
     def __try_to_run_with_args(
-        trigger: Callable, *args: Any, **kwargs: Any
+        action: Callable, *args: Any, **kwargs: Any
     ) -> None:
         try:
-            trigger(*args, **kwargs)
+            action(*args, **kwargs)
         except TypeError:
-            trigger()
+            action()
 
 
 class Guard:
-    __slots__ = ['rule']
+    __slots__ = ['__machine']
 
-    def __init__(self, rule: Optional[EventTrigger] = None) -> None:
-        self.rule = rule
+    def __init__(self, machine: 'StateChart') -> None:
+        self.__machine = machine
 
-    def check(self, machine: 'StateMachine') -> bool:
-        if self.rule is None:
-            return True
-        items = _tuplize(self.rule)
+    def check(self, cond: GuardConditions) -> bool:
+        items = _tuplize(cond)
         result = True
         for item in items:
-            result = result and self.__evaluate(machine, item)
+            result = result and self.__evaluate(self.__machine, item)
         return result
 
     @staticmethod
-    def __evaluate(machine: 'StateMachine', item: EventTrigger) -> bool:
+    def __evaluate(machine: 'StateChart', item: GuardCondition) -> bool:
         if callable(item):
             return item(machine)
         else:

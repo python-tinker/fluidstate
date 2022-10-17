@@ -16,21 +16,18 @@ class StopLight(StateMachine):
 
     transition(
         'turn_green',
-        before='red',
-        after='green',
-        trigger=lambda: asyncio.sleep(5),
+        target='green',
+        action=lambda: asyncio.sleep(5),
     )
     transition(
         'turn_yellow',
-        before='green',
-        after='yellow',
-        trigger=lambda: asyncio.sleep(2),
+        target='yellow',
+        action=lambda: asyncio.sleep(2),
     )
     transition(
         'turn_red',
-        before='yellow',
-        after='red',
-        trigger=lambda: asyncio.sleep(5),
+        target='red',
+        action=lambda: asyncio.sleep(5),
     )
 
 

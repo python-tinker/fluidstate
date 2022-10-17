@@ -1,13 +1,13 @@
 import unittest
 
-from fluidstate import StateMachine, state, transition
+from fluidstate import StateChart, state, transition
 
 
-class JumperGuy(StateMachine):
+class JumperGuy(StateChart):
     state('looking')
     state('falling')
     initial_state = 'looking'
-    transition(before='looking', event='jump', after='falling')
+    transition(event='jump', target='falling')
 
 
 class BooleanStateGettersSpec(unittest.TestCase):
@@ -28,7 +28,7 @@ class BooleanStateGettersSpec(unittest.TestCase):
         assert hasattr(guy, 'is_squashed')
         assert guy.state != 'squashed'
 
-        guy.add_transition(before='falling', event='land', after='squashed')
+        guy.add_transition(event='land', target='squashed')
         guy.jump()
         guy.land()
         assert guy.state == 'squashed'

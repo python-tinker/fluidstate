@@ -2,7 +2,7 @@ import unittest
 
 from fluidstate import (
     GuardNotSatisfied,
-    StateMachine,
+    StateChart,
     state,
     transition,
 )
@@ -22,7 +22,7 @@ def pre_falling_function():
     footsteps.append('pre falling')
 
 
-class JumperGuy(StateMachine):
+class JumperGuy(StateChart):
     state(
         'looking',
         on_entry=lambda jumper: jumper.append('pre looking'),
@@ -32,15 +32,14 @@ class JumperGuy(StateMachine):
     initial_state = 'looking'
 
     transition(
-        before='looking',
         event='jump',
-        after='falling',
-        trigger=lambda jumper: jumper.append('trigger jump'),
-        guard=lambda jumper: jumper.append('guard jump') is None,
+        target='falling',
+        action=lambda jumper: jumper.append('action jump'),
+        cond=lambda jumper: jumper.append('guard jump') is None,
     )
 
     def __init__(self):
-        StateMachine.__init__(self)
+        StateChart.__init__(self)
 
     def append(self, text):
         footsteps.append(text)
@@ -57,21 +56,20 @@ class CallableSupport(unittest.TestCase):
                 'pre looking',
                 'on_exit looking',
                 'pre falling',
-                'trigger jump',
+                'action jump',
                 'guard jump',
             ]
         )
 
     def test_it_should_deny_state_change_if_guard_callable_returns_false(self):
-        class Door(StateMachine):
+        class Door(StateChart):
             state('open')
             state('closed')
             initial_state = 'closed'
             transition(
-                before='closed',
                 event='open',
-                after='open',
-                guard=lambda d: not door.locked,
+                target='open',
+                cond=lambda d: not door.locked,
             )
 
             def locked(self):
