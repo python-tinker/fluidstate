@@ -42,12 +42,12 @@ GuardConditions = Union[GuardCondition, Iterable[GuardCondition]]
 StateType = str
 StateTypes = Union[StateType, Iterable[StateType]]
 
-
-def _tuplize(value: Any) -> Tuple[Any, ...]:
-    return tuple(value) if type(value) in [list, tuple] else (value,)
+_state_gatherer: List[Dict[str, Any]] = []
 
 
-_transition_gatherer: List[Dict[str, Any]] = []
+def states(*args: Any) -> None:
+    for arg in args:
+        _state_gatherer.append(arg)
 
 
 def transition(
@@ -55,36 +55,35 @@ def transition(
     target: StateType,
     action: Optional[EventActions] = None,
     cond: Optional[GuardConditions] = None,
-) -> None:
-    log.info(f"recieved transition: {event}, {cond}, {target}")
-    _transition_gatherer.append(
-        {
-            'event': event,
-            'target': target,
-            'action': action,
-            'cond': cond,
-        }
-    )
-
-
-_state_gatherer: List[Dict[str, Any]] = []
+) -> Dict[str, Any]:
+    log.info(f"recieved transition: {event}, {target}")
+    return {
+        'event': event,
+        'target': target,
+        'action': action,
+        'cond': cond,
+    }
 
 
 def state(
     name: str,
+    states: List[Dict[str, Any]] = [],
+    transitions: Union[List[Dict[str, Any]], Dict[str, Any]] = [],
     on_entry: Optional[EventActions] = None,
     on_exit: Optional[EventActions] = None,
-    machine: Optional['StateChart'] = None,
-) -> None:
+) -> Dict[str, Any]:
     log.info(f"recieved state: {name}, {on_entry}, {on_entry}")
-    _state_gatherer.append(
-        {
-            'name': name,
-            'on_entry': on_entry,
-            'on_exit': on_exit,
-            'machine': machine,
-        }
-    )
+    return {
+        'name': name,
+        'states': states,
+        'transitions': transitions,
+        'on_entry': on_entry,
+        'on_exit': on_exit,
+    }
+
+
+def _tuplize(value: Any) -> Tuple[Any, ...]:
+    return tuple(value) if type(value) in [list, tuple] else (value,)
 
 
 class MetaStateChart(type):
@@ -104,29 +103,25 @@ class MetaStateChart(type):
 
         global _transition_gatherer, _state_gatherer
         obj = super(MetaStateChart, cls).__new__(cls, name, bases, attrs)
-        obj._class_transitions = []
         obj._class_states = {}
 
-        # TODO: create slots from here
         for s in _state_gatherer:
             obj._class_states[str(s['name'])] = State(
                 name=str(s['name']),
-                on_entry=s['on_entry'],
-                on_exit=s['on_exit'],
-                machine=s['machine'],  # type: ignore
+                on_entry=s.get('on_entry'),
+                on_exit=s.get('on_exit'),
             )
-
-        for t in _transition_gatherer:
-            transition = Transition(
-                event=str(t['event']),
-                target=str(t['target']),
-                action=t['action'],  # type: ignore
-                cond=t['cond'],  # type: ignore
-            )
-            obj._class_transitions.append(transition)
+        for s in _state_gatherer:
+            for t in s['transitions']:
+                transition = Transition(
+                    event=str(t['event']),
+                    target=t['target'],
+                    action=t.get('action'),
+                    cond=t.get('cond'),
+                )
+                # (obj._class_states[s['name']]).add_transition(transition)
             setattr(obj, str(t['event']), transition._event_callback())
 
-        _transition_gatherer = []
         _state_gatherer = []
         return obj
 
@@ -134,19 +129,18 @@ class MetaStateChart(type):
 class StateChart(metaclass=MetaStateChart):
     initial_state: str
     __states: Dict[str, 'State']
-    __transitions: List['Transition']
-    __slots__ = ['initial_state', '__states', '__transitions', '__dict__']
+    __slots__ = ['initial_state', '__states', '__dict__']
 
     def __new__(cls, *args: Any, **kwargs: Any) -> 'StateChart':
         obj = super(StateChart, cls).__new__(cls)
         obj.__states = {}
-        obj.__transitions = []
         return obj
 
     def __init__(self, initial_state: Optional[str] = None) -> None:
         log.info('initializing statemachine')
-        self.__populate_instance()
+        self.__states.update(self.__class__._class_states)
         self._validate_machine()
+        log.info('loaded states and transitions')
 
         if initial_state:
             self.initial_state = initial_state
@@ -168,11 +162,6 @@ class StateChart(metaclass=MetaStateChart):
         except KeyError:
             raise AttributeError
 
-    def __populate_instance(self) -> None:
-        self.__states.update(self.__class__._class_states)
-        self.__transitions.extend(self.__class__._class_transitions)
-        log.info('loaded states and transitions')
-
     def _validate_machine(self) -> None:
         # TODO: empty statemachine should default to null event
         if len(self.__states) < 2:
@@ -183,7 +172,7 @@ class StateChart(metaclass=MetaStateChart):
 
     @property
     def transitions(self) -> List['Transition']:
-        return self.__transitions
+        return self.state.transitions
 
     @property
     def states(self) -> List['State']:
@@ -280,46 +269,6 @@ class StateChart(metaclass=MetaStateChart):
         return allowed_transitions[0]
 
 
-class Transition:
-    __slots__ = ['event', 'target', 'action', 'cond']
-
-    def __init__(
-        self,
-        event: str,
-        target: str,
-        action: Optional[EventActions] = None,
-        cond: Optional[GuardConditions] = None,
-    ) -> None:
-        self.event = event
-        self.target = target
-        self.action = action
-        self.cond = cond
-
-    def __repr__(self) -> str:
-        return repr(
-            "Transition({e}, target={t})".format(e=self.event, t=self.target)
-        )
-
-    def _event_callback(self) -> Callable:
-        def event(machine, *args, **kwargs):
-            machine._process_transitions(self.event, *args, **kwargs)
-            log.info(f"processed {self.event}")
-
-        event.__doc__ = f"event {self.event}"
-        event.__name__ = self.event
-        return event
-
-    def check_guard(self, machine: 'StateChart') -> bool:
-        return Guard(machine).check(self.cond) if self.cond else True
-
-    def run(self, machine: 'StateChart', *args: Any, **kwargs: Any) -> None:
-        machine.state.run_on_exit(machine)
-        machine._update_state(self.target)
-        machine._get_state(self.target).run_on_entry(machine)
-        Action(machine).run(self.action, *args, **kwargs)
-        log.info(f"executed action event for {self.event}")
-
-
 class State:
     __slots__ = ['name', 'on_entry', 'on_exit', 'machine']
 
@@ -368,6 +317,46 @@ class State:
         if self.on_exit is not None:
             Action(machine).run(self.on_exit)
             log.info(f"executed 'on_exit' state change action for {self.name}")
+
+
+class Transition:
+    __slots__ = ['event', 'target', 'action', 'cond']
+
+    def __init__(
+        self,
+        event: str,
+        target: str,
+        action: Optional[EventActions] = None,
+        cond: Optional[GuardConditions] = None,
+    ) -> None:
+        self.event = event
+        self.target = target
+        self.action = action
+        self.cond = cond
+
+    def __repr__(self) -> str:
+        return repr(
+            "Transition({e}, target={t})".format(e=self.event, t=self.target)
+        )
+
+    def _event_callback(self) -> Callable:
+        def event(machine, *args, **kwargs):
+            machine._process_transitions(self.event, *args, **kwargs)
+            log.info(f"processed {self.event}")
+
+        event.__doc__ = f"event {self.event}"
+        event.__name__ = self.event
+        return event
+
+    def check_guard(self, machine: 'StateChart') -> bool:
+        return Guard(machine).check(self.cond) if self.cond else True
+
+    def run(self, machine: 'StateChart', *args: Any, **kwargs: Any) -> None:
+        machine.state.run_on_exit(machine)
+        machine._update_state(self.target)
+        machine._get_state(self.target).run_on_entry(machine)
+        Action(machine).run(self.action, *args, **kwargs)
+        log.info(f"executed action event for {self.event}")
 
 
 class Action:
