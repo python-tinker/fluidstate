@@ -9,34 +9,55 @@ How to use
 
 A very simple example taken from specs::
 
-    from fluidstate import StateChart, State, Transition, states, transitions
+    >>> from fluidstate import StateChart, State, Transition, states, transitions
 
-    class SimpleMachine(StateChart):
+    >>> class SimpleMachine(StateChart):
+    ...
+    ...     initial = 'created'
+    ...
+    ...     states(
+    ...         State(
+    ...             'created',
+    ...             transitions(
+    ...                 Transition(event='queue', target='waiting'),
+    ...                 Transition(event='cancel', target='canceled'),
+    ...             ),
+    ...         ),
+    ...         State(
+    ...             'waiting',
+    ...             transitions(
+    ...                 Transition(event='process', target='processed'),
+    ...                 Transition(event='cancel', target='canceled'),
+    ...             )
+    ...         ),
+    ...         State('processed'),
+    ...         State('canceled'),
+    ...     )
 
-         initial = 'created'
+    >>> machine = SimpleMachine()
 
-         states(
-             State(
-                 'created',
-                 transitions(
-                     Transition(event='queue', after='waiting')
-                 ),
-             ),
-             State(
-                 'waiting',
-                 transitions(
-                     Transition(event='process', after='processed')
-                 )
-             ),
-             State(
-                 'processed',
-                 transitions(
-                     Transition(event='cancel', after='canceled')
-                 )
-             ),
-             State('canceled')
-         )
+    >>> machine.state
+    'State(created)'
 
+    >>> machine.queue()
+
+    >>> machine.state
+    'State(waiting)'
+
+    >>> machine.process()
+
+    >>> machine.state
+    'State(processed)'
+
+    >>> cancel_machine = SimpleMachine()
+
+    >>> cancel_machine.state
+    'State(created)'
+
+    >>> cancel_machine.cancel()
+
+    >>> cancel_machine.state
+    'State(canceled)'
 
 
 "A slightly more complex example"
@@ -44,71 +65,70 @@ A very simple example taken from specs::
 
 For demonstrating more advanced capabilities::
 
-    from fluidstate import (
-        StateChart,
-        State,
-        Transition,
-        states,
-        transitions
-    )
+    >>> from fluidstate import (
+    ...     StateChart,
+    ...     State,
+    ...     Transition,
+    ...     states,
+    ...     transitions,
+    ... )
 
-    class Relationship(StateChart):
-        initial = (
-            lambda relationship: relationship.strictly_for_fun() and 'intimate' or 'dating'
-        )
+    >>> class Relationship(StateChart):
+    ...     initial = 'dating'
+    ...     states(
+    ...         State(
+    ...             name='dating',
+    ...             transitions=transitions(
+    ...                 Transition(
+    ...                     event='get_intimate', target='intimate', cond='drunk'
+    ...                 )
+    ...             ),
+    ...             on_entry='make_happy',
+    ...             on_exit='make_depressed',
+    ...         ),
+    ...         State(
+    ...             name='intimate',
+    ...             transitions=transitions(
+    ...                 Transition(
+    ...                     event='get_married',
+    ...                     target='married',
+    ...                     cond='willing_to_give_up_manhood',
+    ...                 )
+    ...             ),
+    ...             on_entry='make_very_happy',
+    ...             on_exit='never_speak_again',
+    ...         ),
+    ...         State(name='married', on_entry='give_up_intimacy', on_exit='buy_exotic_car')
+    ...     )
 
-        states(
-            state(
-                'dating',
-                transitions(
-                    transition(
-                        event='get_intimate', after='intimate', need='drunk'
-                    )
-                )
-                on_entry='make_happy',
-                on_exit='make_depressed'
-            )
-            state(
-                'intimate',
-                transitions(
-                    Transition(
-                        event='get_married',
-                        after='married',
-                        need='willing_to_give_up_manhood'
-                    )
-                ),
-                on_entry='make_very_happy',
-                on_exit='never_speak_again',
-            )
-            state('married', on_entry='give_up_intimacy', on_exit='buy_exotic_car')
-        )
+    ...     def strictly_for_fun(self) -> None:
+    ...         pass
 
-        def strictly_for_fun(self) -> None:
-            pass
+    ...     def drunk(self) -> bool:
+    ...         return True
 
-        def drunk(self) -> bool:
-            return True
+    ...     def willing_to_give_up_manhood(self) -> bool:
+    ...         return True
 
-        def willing_to_give_up_manhood(self) -> bool:
-            return True
+    ...     def make_happy(self) -> None:
+    ...         pass
 
-        def make_happy(self) -> None:
-            pass
+    ...     def make_depressed(self) -> None:
+    ...         pass
 
-        def make_depressed(self) -> None:
-            pass
+    ...     def make_very_happy(self) -> None:
+    ...         pass
 
-        def make_very_happy(self) -> None:
-            pass
+    ...     def never_speak_again(self) -> None:
+    ...         pass
 
-        def never_speak_again(self) -> None:
-            pass
+    ...     def give_up_intimacy(self) -> None:
+    ...         pass
 
-        def give_up_intimacy(self) -> None:
-            pass
+    ...     def buy_exotic_car(self) -> None:
+    ...         pass
 
-        def buy_exotic_car(self) -> None:
-            pass
+    >>> relationship = Relationship()
 
 
 States
@@ -125,22 +145,21 @@ Transitions
 -----------
 
 Transitions lead the machine from a state to another. Transitions must have
-*before*, *after*, and *event* parameters. *before* is one or more (as list) states
-from which the transition can be preed. *after* is the state to which the
-transition will lead the machine. *event* is the method that have to be called
-to launch the transition. This method is automatically created by the Fluidstate
-engine.
+the *event*, and *target* parameters. The *event* is the method that have to be
+called to launch the transition. The *target* is the state to which the
+transition will move the machine. This method is automatically created
+by the Fluidstate engine.
 
-A transition can have optional *trigger* and *need* parameters. *trigger* is a
+A transition can have optional *action* and *cond* parameters. *action* is a
 method (or callable) that will be called when transition is launched. If
-parameters are passed to the event method, they are passed to the *trigger*
-method, if it accepts these parameters. *need* is a method (or callable) that
+parameters are passed to the event method, they are passed to the *action*
+method, if it accepts these parameters. *cond* is a method (or callable) that
 is called to allow or deny the transition, depending on the result of its
-execution. Both "trigger" and *need* can be lists.
+execution. Both "action" and *cond* can be lists.
 
 The same event can be in multiple transitions, going to different states, having
 their respective needs as selectors. For the transitions having the same event,
-only one need should return a true value at a time.
+only one *cond* should return a true value at a time.
 
 
 Individuation

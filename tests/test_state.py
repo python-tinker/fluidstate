@@ -65,10 +65,7 @@ class FluidstateState(unittest.TestCase):
                 and 'awake'
                 or 'sleeping'
             )
-            states(
-                State('awake'),
-                State('sleeping'),
-            )
+            states(State('awake'), State('sleeping'))
 
             def __init__(self, worker):
                 self.worker = worker

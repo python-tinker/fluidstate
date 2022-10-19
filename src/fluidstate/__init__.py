@@ -149,15 +149,15 @@ class StateChart(metaclass=MetaStateChart):
             self.__register_state_callback(state)
         log.info('statemachine initialization complete')
 
-    def __getattr__(self, name: str) -> Any:
-        try:
-            for x in self.state.transitions:
-                if x.event == name:
-                    return x.callback()
-            else:
-                raise KeyError
-        except KeyError:
-            raise AttributeError
+    # def __getattr__(self, name: str) -> Any:
+    #     try:
+    #         for x in self.state.transitions:
+    #             if x.event == name:
+    #                 return x.callback()
+    #         else:
+    #             raise KeyError
+    #     except KeyError:
+    #         raise AttributeError
 
     def __register_transition_callback(self, transition: 'Transition') -> None:
         setattr(
