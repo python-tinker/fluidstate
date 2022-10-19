@@ -1,14 +1,26 @@
 import unittest
 
-from fluidstate import StateChart, state, transition
+from fluidstate import StateChart, State, Transition, states, transitions
 
 
 class Door(StateChart):
-    state('closed')
-    state('open')
-    initial_state = 'closed'
-    transition(event='open', target='open', action='open_action')
-    transition(event='close', target='closed', action='close_action')
+    states(
+        State(
+            'closed',
+            transitions=transitions(
+                Transition(event='open', target='open', action='open_action')
+            ),
+        ),
+        State(
+            'open',
+            transitions=transitions(
+                Transition(
+                    event='close', target='closed', action='close_action'
+                )
+            ),
+        ),
+    )
+    initial = 'closed'
 
     def open_action(self, when, where):
         self.when = when

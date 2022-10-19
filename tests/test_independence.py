@@ -10,7 +10,7 @@ from fluidstate import (
 
 class MyMachine(StateChart):
 
-    initial_state = 'off'
+    initial = 'off'
 
     state('off', on_entry='inc_off')
     state('on', on_entry='inc_on')

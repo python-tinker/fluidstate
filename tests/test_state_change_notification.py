@@ -8,7 +8,7 @@ class Door(StateChart):
     state('open')
     state('closed')
     state('broken')
-    initial_state = 'closed'
+    initial = 'closed'
 
     transition(event='open', target='open')
     transition(event='close', target='closed')

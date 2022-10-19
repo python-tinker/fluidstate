@@ -1,18 +1,20 @@
 import unittest
 
-from fluidstate import StateChart, state, transition
+from fluidstate import StateChart, State, Transition, states, transitions
 
 
 class ActionMachine(StateChart):
 
-    state(
-        'created',
-        on_entry='about_to_create',
-        on_exit=['other_on_exit_create', 'on_exit_create'],
+    states(
+        State(
+            'created',
+            transitions(Transition(event='queue', target='waiting')),
+            on_entry='about_to_create',
+            on_exit=['other_on_exit_create', 'on_exit_create'],
+        ),
+        State('waiting', on_entry=['pre_wait', 'other_pre_wait']),
     )
-    state('waiting', on_entry=['pre_wait', 'other_pre_wait'])
-    initial_state = 'created'
-    transition(event='queue', target='waiting')
+    initial = 'created'
 
     def __init__(self):
         self.pre_create = False
@@ -82,7 +84,7 @@ class FluidstateAction(unittest.TestCase):
         )
         machine.queue()
 
-    def test_it_runs_pre_action_for_initial_state_at_creation(self):
+    def test_it_runs_pre_action_for_initial_at_creation(self):
         assert ActionMachine().pre_create is True
 
     def test_it_accepts_many_pre_actions(self):

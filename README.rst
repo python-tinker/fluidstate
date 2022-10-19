@@ -9,20 +9,34 @@ How to use
 
 A very simple example taken from specs::
 
-    from fluidstate import StateMachine, state, transition
+    from fluidstate import StateChart, State, Transition, states, transitions
 
-    class SimpleMachine(StateMachine):
+    class SimpleMachine(StateChart):
 
-         initial_state = 'created'
+         initial = 'created'
 
-         state('created')
-         state('waiting')
-         state('processed')
-         state('canceled')
+         states(
+             State(
+                 'created',
+                 transitions(
+                     Transition(event='queue', after='waiting')
+                 ),
+             ),
+             State(
+                 'waiting',
+                 transitions(
+                     Transition(event='process', after='processed')
+                 )
+             ),
+             State(
+                 'processed',
+                 transitions(
+                     Transition(event='cancel', after='canceled')
+                 )
+             ),
+             State('canceled')
+         )
 
-         transition(before='created', event='queue', after='waiting')
-         transition(before='waiting', event='process', after='processed')
-         transition(before=['waiting', 'created'], event='cancel', after='canceled')
 
 
 "A slightly more complex example"
@@ -30,51 +44,71 @@ A very simple example taken from specs::
 
 For demonstrating more advanced capabilities::
 
-        from fluidstate import StateMachine, state, transition
+    from fluidstate import (
+        StateChart,
+        State,
+        Transition,
+        states,
+        transitions
+    )
 
-        class Relationship(StateMachine):
-            initial_state = (
-                lambda relationship: relationship.strictly_for_fun() and 'intimate' or 'dating'
+    class Relationship(StateChart):
+        initial = (
+            lambda relationship: relationship.strictly_for_fun() and 'intimate' or 'dating'
+        )
+
+        states(
+            state(
+                'dating',
+                transitions(
+                    transition(
+                        event='get_intimate', after='intimate', need='drunk'
+                    )
+                )
+                on_entry='make_happy',
+                on_exit='make_depressed'
             )
-
-            state('dating', on_entry='make_happy', on_exit='make_depressed')
-            state('intimate', on_entry='make_very_happy', on_exit='never_speak_again')
+            state(
+                'intimate',
+                transitions(
+                    Transition(
+                        event='get_married',
+                        after='married',
+                        need='willing_to_give_up_manhood'
+                    )
+                ),
+                on_entry='make_very_happy',
+                on_exit='never_speak_again',
+            )
             state('married', on_entry='give_up_intimacy', on_exit='buy_exotic_car')
+        )
 
-            transition(before='dating', event='get_intimate', after='intimate', need='drunk')
-            transition(
-                before=['dating', 'intimate'],
-                event='get_married',
-                after='married',
-                need='willing_to_give_up_manhood'
-            )
+        def strictly_for_fun(self) -> None:
+            pass
 
-            def strictly_for_fun(self) -> None:
-                pass
+        def drunk(self) -> bool:
+            return True
 
-            def drunk(self) -> bool:
-                return True
+        def willing_to_give_up_manhood(self) -> bool:
+            return True
 
-            def willing_to_give_up_manhood(self) -> bool:
-                return True
+        def make_happy(self) -> None:
+            pass
 
-            def make_happy(self) -> None:
-                pass
+        def make_depressed(self) -> None:
+            pass
 
-            def make_depressed(self) -> None:
-                pass
+        def make_very_happy(self) -> None:
+            pass
 
-            def make_very_happy(self) -> None:
-                pass
+        def never_speak_again(self) -> None:
+            pass
 
-            def never_speak_again(self) -> None:
-                pass
+        def give_up_intimacy(self) -> None:
+            pass
 
-            def give_up_intimacy(self) -> None:
-                pass
-
-            def buy_exotic_car(self) -> None:
-                pass
+        def buy_exotic_car(self) -> None:
+            pass
 
 
 States
@@ -134,7 +168,7 @@ Run::
 Test
 ----
 
-Rn::
+Run::
 
     tox
 

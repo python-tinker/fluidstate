@@ -1,6 +1,11 @@
 import unittest
 
-from fluidstate import InvalidConfig, StateChart, state
+from fluidstate import (
+    InvalidConfig,
+    StateChart,
+    State,
+    states,
+)
 
 
 class ConfigurationValidation(unittest.TestCase):
@@ -13,25 +18,23 @@ class ConfigurationValidation(unittest.TestCase):
             # InvalidConfig, message="There must be at least two states"
 
         class OtherMachine(StateChart):
-            state('open')
+            states(State('open'))
 
         with self.assertRaises(InvalidConfig):
             OtherMachine()
             # InvalidConfig, message="There must be at least two states"
 
-    def test_it_requires_an_initial_state(self):
+    def test_it_requires_an_initial(self):
         class MyMachine(StateChart):
-            state('open')
-            state('closed')
+            states(State('open'), State('closed'))
 
         with self.assertRaises(InvalidConfig):
             MyMachine()
             # InvalidConfig, message="There must be at least two states"
 
         class AnotherMachine(StateChart):
-            state('open')
-            state('closed')
-            initial_state = None
+            states(State('open'), State('closed'))
+            initial = None
 
         with self.assertRaises(InvalidConfig):
             AnotherMachine()

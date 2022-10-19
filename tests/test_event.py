@@ -1,20 +1,36 @@
 import unittest
 
-from fluidstate import InvalidTransition, StateChart, state, transition
+from fluidstate import (
+    InvalidTransition,
+    StateChart,
+    State,
+    Transition,
+    states,
+)
 
 
 class MyMachine(StateChart):
 
-    initial_state = 'created'
+    initial = 'created'
 
-    state('created')
-    state('waiting')
-    state('processed')
-    state('canceled')
-
-    transition(event='queue', target='waiting')
-    transition(event='process', target='processed')
-    transition(event='cancel', target='canceled')
+    states(
+        State(
+            'created',
+            transitions=[
+                Transition(event='queue', target='waiting'),
+                Transition(event='cancel', target='canceled'),
+            ],
+        ),
+        State(
+            'waiting',
+            transitions=[
+                Transition(event='process', target='processed'),
+                Transition(event='cancel', target='canceled'),
+            ],
+        ),
+        State('processed'),
+        State('canceled'),
+    )
 
 
 class FluidstateEvent(unittest.TestCase):
@@ -23,7 +39,7 @@ class FluidstateEvent(unittest.TestCase):
         assert hasattr(machine, 'queue') and callable(machine.queue)
         assert hasattr(machine, 'process') and callable(machine.process)
 
-    def test_it_changes_machine_state(self):
+    def test_it_changes_machine_State(self):
         machine = MyMachine()
         machine.state == 'created'
         machine.queue()
@@ -31,19 +47,20 @@ class FluidstateEvent(unittest.TestCase):
         machine.process()
         machine.state == 'processed'
 
-    # def test_it_ensures_event_order(self):
-    #     machine = MyMachine()
-    #     # TODO: statechart acts differently; no before
-    #     # with self.assertRaises(InvalidTransition):
-    #     #     machine.process()
+    def test_it_ensures_event_order(self):
+        machine = MyMachine()
+        print(machine.state)
+        with self.assertRaises(InvalidTransition):
+            machine.process()
 
-    #     machine.queue()
-    #     with self.assertRaises(InvalidTransition):
-    #         machine.queue()
-    #     try:
-    #         machine.process
-    #     except Exception:
-    #         self.fail('machine process failed')
+        machine.queue()
+        with self.assertRaises(InvalidTransition):
+            machine.queue()
+
+        try:
+            machine.process()
+        except Exception:
+            self.fail('machine process failed')
 
     def test_it_accepts_multiple_origin_states(self):
         machine = MyMachine()
@@ -62,9 +79,8 @@ class FluidstateEvent(unittest.TestCase):
         machine = MyMachine()
         machine.queue()
         machine.process()
-        # TODO: startchart acts differently; no before
-        # with self.assertRaises(Exception):
-        #     machine.cancel()
+        with self.assertRaises(Exception):
+            machine.cancel()
 
 
 if __name__ == '__main__':

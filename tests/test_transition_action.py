@@ -1,17 +1,23 @@
 import unittest
 
-from fluidstate import StateChart, state, transition
+from fluidstate import StateChart, State, Transition, states, transitions
 
 
 class CrazyGuy(StateChart):
-    state('looking')
-    state('falling')
-    initial_state = 'looking'
-    transition(
-        event='jump',
-        target='falling',
-        action=['become_at_risk', 'accelerate'],
+    states(
+        State(
+            'looking',
+            transitions(
+                Transition(
+                    event='jump',
+                    target='falling',
+                    action=['become_at_risk', 'accelerate'],
+                )
+            ),
+        ),
+        State('falling'),
     )
+    initial = 'looking'
 
     def __init__(self):
         StateChart.__init__(self)

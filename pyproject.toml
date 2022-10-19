@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "fluidstate"
 version = "1.0.0b2"
-description = "Compact statechart in Python that can be vendored."
+description = "Compact statechart that can be vendored."
 readme = "README.rst"
 license = {file = "LICENSE"}
 keywords = ["statechart", "state machine"]
