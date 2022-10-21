@@ -78,7 +78,8 @@ def state(arg: Union['State', dict, str]) -> 'State':
     if isinstance(arg, dict):
         if 'states' in arg:
             machine = StateChart(
-                initial=arg['initial'], states=states(arg['states'])
+                initial=arg['initial'],
+                states=states(arg['states'], update_global=False),
             )
         else:
             machine = None
@@ -219,8 +220,10 @@ class StateChart(metaclass=MetaStateChart):
                 return state
         raise InvalidState(f"state could not be found: {name}")
 
-    def _update_state(self, state: str) -> None:
+    def _change_state(self, state: str) -> None:
+        self.state._run_on_exit(self)
         self.__state = self.get_state(state)
+        self.__state._run_on_entry(self)
         log.info(f"changed state to {state}")
 
     def add_state(self, state: 'State') -> None:
@@ -368,9 +371,7 @@ class Transition:
         return Guard(machine).evaluate(self.cond) if self.cond else True
 
     def run(self, machine: 'StateChart', *args: Any, **kwargs: Any) -> None:
-        machine.state._run_on_exit(machine)
-        machine._update_state(self.target)
-        machine.get_state(self.target)._run_on_entry(machine)
+        machine._change_state(self.target)
         if self.action:
             Action(machine).run(self.action, *args, **kwargs)
             log.info(f"executed action event for '{self.event}'")
