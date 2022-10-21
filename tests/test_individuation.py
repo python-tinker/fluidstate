@@ -19,9 +19,10 @@ class IndividuationSpec(unittest.TestCase):
 
     def setUp(self):
         self.door = Door()
-        self.door.add_state('broken')
+        self.door.add_state(State('broken'))
         self.door.add_transition(
-            state='closed', event='crack', target='broken'
+            Transition(event='crack', target='broken'),
+            state='closed',
         )
 
     def test_it_responds_to_an_event(self):

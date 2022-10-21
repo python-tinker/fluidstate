@@ -25,11 +25,13 @@ class BooleanStateGettersSpec(unittest.TestCase):
 
     def test_it_has_boolean_getters_for_individual_states(self):
         guy = JumperGuy()
-        guy.add_state('squashed')
+        guy.add_state(State('squashed'))
         assert hasattr(guy, 'is_squashed')
         assert guy.state != 'squashed'
 
-        guy.add_transition(state='falling', event='land', target='squashed')
+        guy.add_transition(
+            Transition(event='land', target='squashed'), state='falling'
+        )
         guy.jump()
         guy.land()
         assert guy.state == 'squashed'
