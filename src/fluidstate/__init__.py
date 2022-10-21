@@ -66,6 +66,8 @@ def states(*args: Any) -> List['State']:
     def add_states(*state_args: Any) -> List['State']:
         states = []
         for arg in state_args:
+            if isinstance(arg, str):
+                state = State(arg)
             if isinstance(arg, State):
                 state = arg
             if isinstance(arg, dict):
