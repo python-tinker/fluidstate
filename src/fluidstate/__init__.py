@@ -125,13 +125,7 @@ class MetaStateChart(type):
 
 class StateChart(metaclass=MetaStateChart):
     __slots__ = ['initial', '__states', '__dict__']
-    __states: Dict[str, 'State']
     initial: Union[Callable, str]
-
-    def __new__(cls, *args: Any, **kwargs: Any) -> 'StateChart':
-        obj = super(StateChart, cls).__new__(cls)
-        obj.__states = {}
-        return obj
 
     def __init__(
         self,
@@ -145,7 +139,9 @@ class StateChart(metaclass=MetaStateChart):
             log.addHandler(logging.StreamHandler())
         log.info('initializing statemachine')
 
-        # TODO: attempt defining as class variable first
+        self.__traverse_states = kwargs.get('traverse_states', False)
+
+        self.__states: Dict[str, 'State'] = {}
         if states != []:
             self.__states = {s.name: s for s in states}
         else:
@@ -169,6 +165,10 @@ class StateChart(metaclass=MetaStateChart):
             for x in self.state.transitions:
                 if x.event == name:
                     return x.callback()
+            if self.__traverse_states:
+                for key, value in self.__states.items():
+                    if key == name:
+                        return self.__items[name]
             else:
                 raise KeyError
         except KeyError:
@@ -214,11 +214,21 @@ class StateChart(metaclass=MetaStateChart):
             log.error('state is undefined')
             raise KeyError
 
-    def get_state(self, name: str) -> 'State':
+    def get_state(self, query: str) -> 'State':
         for state in self.states:
-            if state.name == name:
+            if state.name == query:
                 return state
-        raise InvalidState(f"state could not be found: {name}")
+        raise InvalidState(f"state could not be found: {query}")
+
+    # def get_state(self, query: str) -> 'Foo':
+    #     paths = query.split('.')
+
+    #     current = self
+    #     for i, state in enumerate(paths):
+    #         current = current.items[state]
+    #         if i == (len(paths) - 1):
+    #             return current
+    #     raise InvalidState(f"state could not be found: {query}")
 
     def _change_state(self, state: str) -> None:
         self.state._run_on_exit(self)
@@ -265,7 +275,6 @@ class StateChart(metaclass=MetaStateChart):
 
 class State:
     __slots__ = ['__transitions', 'name', 'on_entry', 'on_exit', 'machine']
-    machine: Optional['StateChart']
 
     def __init__(
         self,
@@ -280,7 +289,7 @@ class State:
         self.on_exit = on_exit
         self.__transitions = transitions
         # if 'transitions' in kwargs:
-        #     self.__transitions.extend('transitions'])
+        #     self.__transitions.extend(kwargs.get('transitions', []))
         self.machine = kwargs['machine'] if 'machine' in kwargs else None
 
     def __repr__(self) -> str:
@@ -292,6 +301,10 @@ class State:
         elif isinstance(other, str):
             return self.name == other
         return False
+
+    # @property
+    # def superstate(self) -> Optional['State']:
+    #     return None
 
     @property
     def substate(self) -> Optional['State']:
