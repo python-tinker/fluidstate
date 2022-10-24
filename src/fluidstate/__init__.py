@@ -55,15 +55,15 @@ STATES: List['State'] = []
 
 def transition(arg: Union['Transition', dict]) -> 'Transition':
     if isinstance(arg, Transition):
-        _transition = arg
+        return arg
     if isinstance(arg, dict):
-        _transition = Transition(
+        return Transition(
             event=arg['event'],
             target=arg['target'],
             action=arg.get('action'),
             cond=arg.get('cond'),
         )
-    return _transition
+    raise InvalidConfig('could not find valid transition configuration')
 
 
 def transitions(*args: Any) -> List['Transition']:
@@ -71,26 +71,18 @@ def transitions(*args: Any) -> List['Transition']:
 
 
 def state(arg: Union['State', dict, str]) -> 'State':
-    if isinstance(arg, str):
-        _state = State(arg)
     if isinstance(arg, State):
-        _state = arg
-    if isinstance(arg, dict):
-        if 'states' in arg:
-            machine = StateChart(
-                initial=arg['initial'],
-                states=states(arg['states'], update_global=False),
-            )
-        else:
-            machine = None
-        _state = State(
+        return arg
+    elif isinstance(arg, str):
+        return State(arg)
+    elif isinstance(arg, dict):
+        return State(
             name=arg['name'],
             transitions=transitions(arg.get('transitions', [])),
             on_entry=arg.get('on_entry'),
             on_exit=arg.get('on_exit'),
-            machine=machine,
         )
-    return _state
+    raise InvalidConfig('could not find valid state configuration')
 
 
 def states(*args: Any, **kwargs: Any) -> List['State']:
@@ -142,10 +134,9 @@ class StateChart(metaclass=MetaStateChart):
         self.__traverse_states = kwargs.get('traverse_states', False)
 
         self.__states: Dict[str, 'State'] = {}
+        self.__states.update(self.__class__._class_states)
         if states != []:
-            self.__states = {s.name: s for s in states}
-        else:
-            self.__states.update(self.__class__._class_states)
+            self.__states.update({s.name: s for s in states})
         self._evaluate_machine()
         log.info('loaded states and transitions')
 
@@ -274,23 +265,31 @@ class StateChart(metaclass=MetaStateChart):
 
 
 class State:
-    __slots__ = ['__transitions', 'name', 'on_entry', 'on_exit', 'machine']
+    __slots__ = [
+        'name',
+        'initial',
+        '__states',
+        '__transitions',
+        '__on_entry',
+        '__on_exit',
+    ]
+    initial: Optional[Union[Callable, str]]
+    __on_entry: Optional[EventActions]
+    __on_exit: Optional[EventActions]
 
     def __init__(
         self,
         name: str,
         transitions: List['Transition'] = [],
-        on_entry: Optional[EventActions] = None,
-        on_exit: Optional[EventActions] = None,
+        states: List['State'] = [],
         **kwargs: Any,
     ) -> None:
         self.name = name
-        self.on_entry = on_entry
-        self.on_exit = on_exit
         self.__transitions = transitions
-        # if 'transitions' in kwargs:
-        #     self.__transitions.extend(kwargs.get('transitions', []))
-        self.machine = kwargs['machine'] if 'machine' in kwargs else None
+        self.__states = {x.name: x for x in states}
+        self.__on_entry = kwargs.get('on_entry')
+        self.__on_exit = kwargs.get('on_exit')
+        self.initial = kwargs.get('initial')
 
     def __repr__(self) -> str:
         return repr(f"State({self.name})")
@@ -306,17 +305,13 @@ class State:
     # def superstate(self) -> Optional['State']:
     #     return None
 
-    @property
-    def substate(self) -> Optional['State']:
-        if self.machine:
-            return self.machine.state
-        return None
+    # @property
+    # def state(self) -> Optional['State']:
+    #     return self.__state
 
     @property
-    def substates(self) -> Optional[List['State']]:
-        if self.machine:
-            return list(self.machine.states)
-        return None
+    def states(self) -> Dict[str, 'State']:
+        return self.__states
 
     @property
     def transitions(self) -> List['Transition']:
@@ -341,15 +336,15 @@ class State:
         )
 
     def _run_on_entry(self, machine: 'StateChart') -> None:
-        if self.on_entry is not None:
-            Action(machine).run(self.on_entry)
+        if self.__on_entry is not None:
+            Action(machine).run(self.__on_entry)
             log.info(
                 f"executed 'on_entry' state change action for {self.name}"
             )
 
     def _run_on_exit(self, machine: 'StateChart') -> None:
-        if self.on_exit is not None:
-            Action(machine).run(self.on_exit)
+        if self.__on_exit is not None:
+            Action(machine).run(self.__on_exit)
             log.info(f"executed 'on_exit' state change action for {self.name}")
 
 
