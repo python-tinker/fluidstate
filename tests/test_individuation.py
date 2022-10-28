@@ -37,10 +37,9 @@ class IndividuationSpec(unittest.TestCase):
         assert self.door.states == ['closed', 'open', 'broken']
 
     # XXX: this has been converted to __getattr__ instead
-    def test_individuation_does_not_affect_other_instances(self):
-        another_door = Door()
-        print(hasattr(another_door, 'crack'))
-        # assert not hasattr(another_door, 'crack')
+    # def test_individuation_does_not_affect_other_instances(self):
+    #     another_door = Door()
+    #     assert not hasattr(another_door, 'crack')
 
 
 if __name__ == '__main__':
