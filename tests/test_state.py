@@ -3,7 +3,7 @@ import unittest
 from fluidstate import StateChart, State, Transition, states
 
 
-class FluidstateState(unittest.TestCase):
+class FluidState(unittest.TestCase):
     def test_it_defines_states(self):
         class MyMachine(StateChart):
             states(State('unread'), State('read'), State('closed'))
@@ -55,27 +55,28 @@ class FluidstateState(unittest.TestCase):
         assert len(machine.states) == 2
         assert machine.states == ['idle', 'working']
 
+    # FIXME: cannot use lamda initialization
     def test_its_initial_may_be_a_callable(self):
         def is_business_hours():
             return True
 
         class Person(StateChart):
+            states(State('awake'), State('sleeping'))
             initial = (
                 lambda person: (person.worker and is_business_hours())
                 and 'awake'
                 or 'sleeping'
             )
-            states(State('awake'), State('sleeping'))
 
             def __init__(self, worker):
                 self.worker = worker
-                StateChart.__init__(self)
+                super().__init__()
 
         person = Person(worker=True)
-        person.state == 'awake'
+        assert person.state == 'awake'
 
         person = Person(worker=False)
-        person.state == 'sleeping'
+        assert person.state == 'sleeping'
 
 
 if __name__ == '__main__':

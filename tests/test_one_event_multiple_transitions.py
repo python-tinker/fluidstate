@@ -11,6 +11,7 @@ from fluidstate import (
 
 
 class LoanRequest(StateChart):
+    initial = 'pending'
     states(
         State(
             'pending',
@@ -40,7 +41,6 @@ class LoanRequest(StateChart):
         State('refused'),
         State('accepted'),
     )
-    initial = 'pending'
 
     def input_data(self, accepted=True):
         self.accepted = accepted

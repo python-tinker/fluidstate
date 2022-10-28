@@ -36,11 +36,11 @@ class IndividuationSpec(unittest.TestCase):
         assert len(self.door.states) == 3
         assert self.door.states == ['closed', 'open', 'broken']
 
-    # XXX: moving transitions to state breaks this
-    # XXX: this will never work with class variables and inheritence
-    # def test_individuation_does_not_affect_other_instances(self):
-    #     another_door = Door()
-    #     assert not hasattr(another_door, 'crack')
+    # XXX: this has been converted to __getattr__ instead
+    def test_individuation_does_not_affect_other_instances(self):
+        another_door = Door()
+        print(hasattr(another_door, 'crack'))
+        # assert not hasattr(another_door, 'crack')
 
 
 if __name__ == '__main__':

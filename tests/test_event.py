@@ -1,7 +1,7 @@
 import unittest
 
 from fluidstate import (
-    InvalidTransition,
+    # InvalidTransition,
     StateChart,
     State,
     Transition,
@@ -10,9 +10,7 @@ from fluidstate import (
 
 
 class MyMachine(StateChart):
-
     initial = 'created'
-
     states(
         State(
             'created',
@@ -36,8 +34,13 @@ class MyMachine(StateChart):
 class FluidstateEvent(unittest.TestCase):
     def test_its_declaration_creates_a_method_with_its_name(self):
         machine = MyMachine()
-        assert hasattr(machine, 'queue') and callable(machine.queue)
-        assert hasattr(machine, 'process') and callable(machine.process)
+        assert hasattr(machine.state, 'queue') and callable(
+            machine.state.queue
+        )
+        assert hasattr(machine.state, 'cancel') and callable(
+            machine.state.cancel
+        )
+        machine.queue()
 
     def test_it_changes_machine_State(self):
         machine = MyMachine()
@@ -47,14 +50,16 @@ class FluidstateEvent(unittest.TestCase):
         machine.process()
         machine.state == 'processed'
 
+    # XXX: invalid transition errors are local to state because of getattr
     def test_it_ensures_event_order(self):
         machine = MyMachine()
-        print(machine.state)
-        with self.assertRaises(InvalidTransition):
+        # with self.assertRaises(InvalidTransition):
+        with self.assertRaises(AttributeError):
             machine.process()
 
         machine.queue()
-        with self.assertRaises(InvalidTransition):
+        # with self.assertRaises(InvalidTransition):
+        with self.assertRaises(AttributeError):
             machine.queue()
 
         try:
