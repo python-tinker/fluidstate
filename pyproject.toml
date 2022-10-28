@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "fluidstate"
 version = "1.1.0a0"
 description = "Compact statechart that can be vendored."
-readme = "README.rst"
+readme = "README.md"
 license = {file = "LICENSE"}
 keywords = ["statechart", "state machine"]
 requires-python = ">=3.6.2"
