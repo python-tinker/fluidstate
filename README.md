@@ -132,6 +132,7 @@ For demonstrating more advanced capabilities::
 >>> relationship = Relationship()
 ```
 
+
 ## States
 
 A Fluidstate state machine must have one initial state and at least one other additional state.
@@ -139,6 +140,7 @@ A Fluidstate state machine must have one initial state and at least one other ad
 A state may have pre and post callbacks, for running some code on state *on_entry*
 and *on_exit*, respectively. These params can be method names (as strings),
 callables, or lists of method names or callables.
+
 
 ## Transitions
 
@@ -159,18 +161,6 @@ The same event can be in multiple transitions, going to different states, having
 their respective needs as selectors. For the transitions having the same event,
 only one *cond* should return a true value at a time.
 
-### Individuation
-
-States and transitions are defined in a class-wide mode. However, one can define
-states and transitions for individual objects. For example, having "door" as a
-state machine::
-
-```
-door.add_state('broken')
-door.add_transition(event='crack', before='closed', after='broken')
-```
-
-These additions only affect the after object.
 
 ### Install
 
@@ -178,11 +168,13 @@ These additions only affect the after object.
 pip install fluidstate
 ```
 
+
 ### Test
 
 ```
 tox
 ```
+
 
 ## Attribution
 
