@@ -1,7 +1,7 @@
 Fluidstate
 ==========
 
-Compact state machine that can be vendored.
+Compact statechart that can be vendored.
 
 
 ## How to use
@@ -12,9 +12,7 @@ A very simple example taken from specs.
 >>> from fluidstate import StateChart, State, Transition, states, transitions
 
 >>> class SimpleMachine(StateChart):
-...
 ...     initial = 'created'
-...
 ...     states(
 ...         State(
 ...             'created',
