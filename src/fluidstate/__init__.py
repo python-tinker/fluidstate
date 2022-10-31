@@ -222,7 +222,7 @@ class State:
         '__transitions',
         '__on_entry',
         '__on_exit',
-        '__type',
+        '__kind',
         '__dict__',
     ]
     __on_entry: Optional[EventActions]
@@ -238,6 +238,7 @@ class State:
         if not name.replace('_', '').isalnum():
             raise InvalidConfig('state name contains invalid characters')
         self.name = name
+        self.__kind = kwargs.get('kind')
         self.__transitions = transitions
         self.__state = self
         self.__states = {x.name: x for x in states}
@@ -245,12 +246,9 @@ class State:
         self.__on_exit = kwargs.get('on_exit')
 
         self.initial = kwargs.get('initial')
-        self.__type = 'compound' if self.states != [] else 'atomic'
 
         for x in self.transitions:
             self.__register_transition_callback(x)
-        # for state in list(self.states.values()):
-        #     self.__register_state_callback(state)
         # self._evaluate_state()
 
     def __repr__(self) -> str:
@@ -271,29 +269,14 @@ class State:
             transition.callback().__get__(self, self.__class__),
         )
 
-    # def __register_state_callback(self, state: 'State') -> None:
-    #     setattr(
-    #         self,
-    #         f"is_{state.name}",
-    #         state.callback().__get__(self, self.__class__),
-    #     )
-
-    def _evaluate_state(self) -> None:
-        # TODO: empty statemachine should default to null event
-        if self.__type == 'compund':
-            if len(self.__states) < 2:
-                raise InvalidConfig('There must be at least two states')
-            if not self.initial:
-                raise InvalidConfig('There must exist an initial state')
-        log.info('evaluated state')
-
-    # def callback(self) -> Callable:
-    #     def state_check(machine):
-    #         return machine.state == self.name
-
-    #     state_check.__name__ = self.name
-    #     state_check.__doc__ = f"Show this: {self.name}."
-    #     return state_check
+    # def _evaluate_state(self) -> None:
+    #     # TODO: empty statemachine should default to null event
+    #     if self.kind == 'compund':
+    #         if len(self.__states) < 2:
+    #             raise InvalidConfig('There must be at least two states')
+    #         if not self.initial:
+    #             raise InvalidConfig('There must exist an initial state')
+    #     log.info('evaluated state')
 
     @property
     def initial(self) -> Optional[str]:
@@ -308,8 +291,27 @@ class State:
             )
 
     @property
-    def type(self) -> str:
-        return self.__type
+    def kind(self) -> str:
+        if self.__kind:
+            kind = self.__kind
+        # elif self.states != [] and self.transitions != []:
+        #     for x in self.transitions:
+        #         if x == '':
+        #             kind = 'transient'
+        #             break
+        #     else:
+        #         kind = 'compound'
+        elif self.states != []:
+            kind = 'compound'
+            # states:
+            #   - parallel
+            #   - and
+            #   - or
+        elif self.transitions != []:
+            kind = 'atomic'
+        else:
+            kind = 'final'
+        return kind
 
     @property
     def state(self) -> 'State':
@@ -328,8 +330,9 @@ class State:
 
     def add_transition(self, transition: 'Transition') -> None:
         self.__transitions.append(transition)
+        self.__register_transition_callback(transition)
 
-    def get_transitions(self, event: str) -> List['Transition']:
+    def get_transition(self, event: str) -> List['Transition']:
         return list(
             filter(
                 lambda transition: transition.event == event, self.transitions
@@ -413,7 +416,7 @@ class StateChart(metaclass=MetaStateChart):
 
     def __getattr__(self, name: str) -> Any:
         # if hasattr(self.__root, name):
-        #     attr = getattr(self.__root, name)
+        #     attr = getattr(self.__superstate, name)
         #     if callable(attr):
 
         #         def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -426,21 +429,22 @@ class StateChart(metaclass=MetaStateChart):
 
         if name.startswith('is_'):
             try:
-                return self.state == name[3:]
+                return self.state.name == name[3:]
             except Exception:
                 raise AttributeError
-
-        try:
-            for x in self.state.transitions:
-                if x.event == name:
-                    return x.callback().__get__(self, self.__class__)
-        except KeyError as err:
-            print(err)
 
         # if self.__traverse_states:
         #     for key in list(self.__states.keys()):
         #         if key == name:
         #             return self.__items[name]
+
+        try:
+            for x in self.state.transitions:
+                if x.event == name:
+                    # XXX: need to improve this
+                    return x.callback().__get__(self, self.__class__)
+        except KeyError as err:
+            print(err)
 
         raise AttributeError
 
@@ -506,13 +510,13 @@ class StateChart(metaclass=MetaStateChart):
     def _process_transitions(
         self, event: str, *args: Any, **kwargs: Any
     ) -> None:
-        _transitions = self.__state.get_transitions(event)
+        _transitions = self.__state.get_transition(event)
         if _transitions == []:
             raise InvalidTransition('no transitions match event')
-        _transition = self._evaluate_guards(_transitions)
+        _transition = self.__evaluate_guards(_transitions)
         _transition.run(self, *args, **kwargs)
 
-    def _evaluate_guards(
+    def __evaluate_guards(
         self, transitions: List['Transition']
     ) -> 'Transition':
         allowed = []
