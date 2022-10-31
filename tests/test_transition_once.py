@@ -68,6 +68,6 @@ def test_it_raises_error_if_more_than_one_guard_passes():
     request = LoanRequest()
     request.analyze()
     request.truify = True
+    # More than one transition was allowed for this event
     with pytest.raises(ForkedTransition):
         request.forward_analysis_result()
-        # message="More than one transition was allowed for this event",

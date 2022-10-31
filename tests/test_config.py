@@ -12,30 +12,31 @@ def test_it_requires_at_least_two_states():
     class MyMachine(StateChart):
         pass
 
+    # There must be at least two states
     with pytest.raises(InvalidConfig):
         MyMachine()
-        # InvalidConfig, message="There must be at least two states"
 
     class OtherMachine(StateChart):
         states(State('open'))
 
+    # There must be at least two states
     with pytest.raises(InvalidConfig):
         OtherMachine()
-        # InvalidConfig, message="There must be at least two states"
 
 
 def test_it_requires_an_initial():
     class MyMachine(StateChart):
         states(State('open'), State('closed'))
 
+    # There must be at least two states
     with pytest.raises(InvalidConfig):
         MyMachine()
-        # InvalidConfig, message="There must be at least two states"
 
     class AnotherMachine(StateChart):
         states(State('open'), State('closed'))
         initial = None
 
+    # An initial state must exist.
     with pytest.raises(InvalidConfig):
         AnotherMachine()
-        # InvalidConfig, message="There must exist an initial state"
+        # InvalidConfig, message=

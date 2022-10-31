@@ -50,7 +50,7 @@ class JumperGuy(StateChart):
         footsteps.append(text)
 
 
-def test_every_callback_can_be_a_callable():
+def test_every_callback_is_callable():
     """every callback can be a callable"""
     guy = JumperGuy()
     guy.jump()
