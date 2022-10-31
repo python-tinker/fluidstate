@@ -1,4 +1,4 @@
-import unittest
+import pytest
 
 from fluidstate import (
     ForkedTransition,
@@ -52,28 +52,22 @@ class LoanRequest(StateChart):
         return not self.accepted or getattr(self, 'truify', False)
 
 
-class FluidstateEventSupportsMultipleTransitions(unittest.TestCase):
-    """Event chooses one of multiple transitions, based in their guards"""
+def test_it_selects_the_transition_having_a_passing_guard():
+    request = LoanRequest()
+    request.analyze()
+    request.forward_analysis_result()
+    request.state == 'accepted'
 
-    def test_it_selects_the_transition_having_a_passing_guard(self):
-        request = LoanRequest()
-        request.analyze()
+    request = LoanRequest()
+    request.analyze(accepted=False)
+    request.forward_analysis_result()
+    request.state == 'refused'
+
+
+def test_it_raises_error_if_more_than_one_guard_passes():
+    request = LoanRequest()
+    request.analyze()
+    request.truify = True
+    with pytest.raises(ForkedTransition):
         request.forward_analysis_result()
-        request.state == 'accepted'
-
-        request = LoanRequest()
-        request.analyze(accepted=False)
-        request.forward_analysis_result()
-        request.state == 'refused'
-
-    def test_it_raises_error_if_more_than_one_guard_passes(self):
-        request = LoanRequest()
-        request.analyze()
-        request.truify = True
-        with self.assertRaises(ForkedTransition):
-            request.forward_analysis_result()
-            # message="More than one transition was allowed for this event",
-
-
-if __name__ == '__main__':
-    unittest.main()
+        # message="More than one transition was allowed for this event",

@@ -1,4 +1,4 @@
-import unittest
+import pytest
 
 from fluidstate import (
     GuardNotSatisfied,
@@ -44,53 +44,49 @@ class JumperGuy(StateChart):
     initial = 'looking'
 
     def __init__(self):
-        StateChart.__init__(self)
+        super().__init__()
 
     def append(self, text):
         footsteps.append(text)
 
 
-class CallableSupport(unittest.TestCase):
-    def test_every_callback_can_be_a_callable(self):
-        """every callback can be a callable"""
-        guy = JumperGuy()
-        guy.jump()
-        assert len(footsteps) == 5
-        assert sorted(footsteps) == sorted(
-            [
-                'pre looking',
-                'on_exit looking',
-                'pre falling',
-                'action jump',
-                'guard jump',
-            ]
-        )
+def test_every_callback_can_be_a_callable():
+    """every callback can be a callable"""
+    guy = JumperGuy()
+    guy.jump()
+    assert len(footsteps) == 5
+    assert sorted(footsteps) == sorted(
+        [
+            'pre looking',
+            'on_exit looking',
+            'pre falling',
+            'action jump',
+            'guard jump',
+        ]
+    )
 
-    def test_deny_state_change_if_guard_callable_returns_false(self):
-        class Door(StateChart):
-            states(
-                State('open'),
-                State(
-                    'closed',
-                    transitions(
-                        Transition(
-                            event='open',
-                            target='open',
-                            cond=lambda d: not door.locked,
-                        )
-                    ),
+
+def test_deny_state_change_if_guard_callable_returns_false():
+    class Door(StateChart):
+        states(
+            State('open'),
+            State(
+                'closed',
+                transitions(
+                    Transition(
+                        event='open',
+                        target='open',
+                        cond=lambda d: not door.locked,
+                    )
                 ),
-            )
-            initial = 'closed'
+            ),
+        )
+        initial = 'closed'
 
-            def locked(self):
-                return self.locked
+        def locked(self):
+            return self.locked
 
-        door = Door()
-        door.locked = True
-        with self.assertRaises(GuardNotSatisfied):
-            door.open()
-
-
-if __name__ == '__main__':
-    unittest.main()
+    door = Door()
+    door.locked = True
+    with pytest.raises(GuardNotSatisfied):
+        door.open()

@@ -1,0 +1,42 @@
+from fluidstate import StateChart, State, Transition, states, transitions
+
+
+class Door(StateChart):
+
+    states(
+        State(
+            'open',
+            transitions=transitions(
+                Transition(event='close', target='closed'),
+                Transition(event='crack', target='broken'),
+            ),
+        ),
+        State(
+            'closed',
+            transitions=transitions(
+                Transition(event='open', target='open'),
+                Transition(event='crack', target='broken'),
+            ),
+        ),
+        State('broken'),
+    )
+    initial = 'closed'
+
+    def __init__(self):
+        self.state_changes = []
+        super(Door, self).__init__()
+
+    def state_trigger(self, source, target):
+        self.state_changes.append((source, target))
+
+
+def test_notify_state_changes():
+    door = Door()
+    door.open()
+    door.close()
+    door.crack()
+    assert door.state_changes == [
+        ('closed', 'open'),
+        ('open', 'closed'),
+        ('closed', 'broken'),
+    ]

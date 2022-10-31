@@ -1,4 +1,4 @@
-import unittest
+import pytest
 
 from fluidstate import StateChart, State, Transition, states, transitions
 
@@ -22,7 +22,7 @@ class CrazyGuy(StateChart):
     initial = 'looking'
 
     def __init__(self):
-        StateChart.__init__(self)
+        super().__init__()
         self.at_risk = False
         self.callbacks = []
 
@@ -41,28 +41,28 @@ class CrazyGuy(StateChart):
         return True
 
 
-class CallbackOrder(unittest.TestCase):
-    def setUp(self):
-        guy = CrazyGuy()
-        guy.jump()
-        self.callbacks = guy.callbacks
-
-    def test_it_runs_guard_first(self):
-        """(1) guard"""
-        self.callbacks[0] == 'guard'
-
-    def test_it_and_then_old_state_on_exit(self):
-        """(2) old state on_exit action"""
-        self.callbacks[1] == 'old on_exit'
-
-    def test_it_and_then_new_state_on_exit(self):
-        """(3) new state pre action"""
-        self.callbacks[2] == 'new pre'
-
-    def test_it_and_then_transaction_action(self):
-        """(4) transaction action"""
-        self.callbacks[3] == 'action'
+@pytest.fixture
+def setup_guy():
+    guy = CrazyGuy()
+    guy.jump()
+    return guy
 
 
-if __name__ == '__main__':
-    unittest.main()
+def test_it_runs_guard_first(setup_guy):
+    """(1) guard"""
+    setup_guy.callbacks[0] == 'guard'
+
+
+def test_it_and_then_old_state_on_exit(setup_guy):
+    """(2) old state on_exit action"""
+    setup_guy.callbacks[1] == 'old on_exit'
+
+
+def test_it_and_then_new_state_on_exit(setup_guy):
+    """(3) new state pre action"""
+    setup_guy.callbacks[2] == 'new pre'
+
+
+def test_it_and_then_transaction_action(setup_guy):
+    """(4) transaction action"""
+    setup_guy.callbacks[3] == 'action'
