@@ -39,4 +39,3 @@ def test_it_requires_an_initial():
     # An initial state must exist.
     with pytest.raises(InvalidConfig):
         AnotherMachine()
-        # InvalidConfig, message=

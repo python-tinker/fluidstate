@@ -53,10 +53,10 @@ def test_two_machines_dont_share_actions():
     machine_a = MyMachine()
     machine_b = MyMachine()
 
-    machine_a.on_count == 0
-    machine_b.on_count == 0
+    assert machine_a.on_count == 0
+    assert machine_b.on_count == 0
 
     machine_a.toggle()
 
-    machine_a.on_count == 1
-    machine_b.on_count == 0
+    assert machine_a.on_count == 1
+    assert machine_b.on_count == 0
