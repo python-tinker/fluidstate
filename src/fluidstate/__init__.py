@@ -228,7 +228,7 @@ class Transition:
         return Guard(machine).evaluate(self.cond) if self.cond else True
 
     def run(self, machine: 'StateChart', *args: Any, **kwargs: Any) -> None:
-        machine._change_state(self.target)
+        machine.change_state(self.target)
         if self.action:
             Action(machine).run(self.action, *args, **kwargs)
             log.info(f"executed action event for '{self.event}'")
@@ -503,7 +503,7 @@ class StateChart(metaclass=MetaStateChart):
                 return current
         raise InvalidState(f"state could not be found: {query}")
 
-    def _change_state(self, state: str) -> None:
+    def change_state(self, state: str) -> None:
         superstate = state.split('.')[:-1]
         self.__supertstate = (
             self.get_state('.'.join(superstate))

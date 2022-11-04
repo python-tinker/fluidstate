@@ -2,49 +2,54 @@
 
 import asyncio
 
-from fluidstate import StateChart, State, Transition, states, transitions
+from fluidstate import StateChart, State, Transition, create_machine
+
+# XXX: somehow broke this but not sure if it ever worked
 
 
 class StopLight(StateChart):
     """Proide an object representing a stoplight."""
 
-    states(
-        State(
-            'red',
-            transitions=transitions(
-                Transition(
-                    'turn_green',
-                    target='green',
-                    action=lambda: asyncio.sleep(5),
-                )
-            ),
-            on_entry=lambda: print('Red light!'),
-        ),
-        State(
-            'yellow',
-            transitions=transitions(
-                Transition(
-                    'turn_red',
-                    target='red',
-                    action=lambda: asyncio.sleep(5),
-                )
-            ),
-            on_entry=lambda: print('Yellow light!'),
-        ),
-        State(
-            'green',
-            transitions=transitions(
-                Transition(
-                    'turn_yellow',
-                    target='yellow',
-                    action=lambda: asyncio.sleep(2),
-                )
-            ),
-            on_entry=lambda: print('Green light!'),
-        ),
+    create_machine(
+        {
+            'initial': 'red',
+            'states': [
+                State(
+                    'red',
+                    transitions=[
+                        Transition(
+                            'turn_green',
+                            target='green',
+                            action=lambda: asyncio.sleep(5),
+                        )
+                    ],
+                    on_entry=lambda: print('Red light!'),
+                ),
+                State(
+                    'yellow',
+                    transitions=[
+                        Transition(
+                            'turn_red',
+                            target='red',
+                            action=lambda: asyncio.sleep(5),
+                        )
+                    ],
+                    on_entry=lambda: print('Yellow light!'),
+                ),
+                State(
+                    'green',
+                    transitions=[
+                        Transition(
+                            'turn_yellow',
+                            target='yellow',
+                            action=lambda: asyncio.sleep(2),
+                        )
+                    ],
+                    on_entry=lambda: print('Green light!'),
+                ),
+            ],
+        }
     )
-
-    initial: str = 'red'
 
 
 if __name__ == '__main__':

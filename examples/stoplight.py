@@ -2,47 +2,51 @@
 
 import time
 
-from fluidstate import StateChart, State, Transition, states, transitions
+from fluidstate import StateChart, create_machine
 
 
 class StopLight(StateChart):
     """Proide an object representing a stoplight."""
 
-    initial: str = 'red'
-    states(
-        State(
-            name='red',
-            transitions=transitions(
-                Transition(
-                    event='turn_green',
-                    target='green',
-                    action=lambda: time.sleep(5),
-                )
-            ),
-            on_entry=lambda: print('Red light!'),
-        ),
-        State(
-            name='yellow',
-            transitions=transitions(
-                Transition(
-                    event='turn_red',
-                    target='red',
-                    action=lambda: time.sleep(5),
-                )
-            ),
-            on_entry=lambda: print('Yellow light!'),
-        ),
-        State(
-            name='green',
-            transitions=transitions(
-                Transition(
-                    event='turn_yellow',
-                    target='yellow',
-                    action=lambda: time.sleep(5),
-                )
-            ),
-            on_entry=lambda: print('Green light!'),
-        ),
+    create_machine(
+        {
+            'initial': 'red',
+            'states': [
+                {
+                    'name': 'red',
+                    'transitions': [
+                        {
+                            'event': 'turn_green',
+                            'target': 'green',
+                            'action': lambda: time.sleep(5),
+                        }
+                    ],
+                    'on_entry': lambda: print('Red light!'),
+                },
+                {
+                    'name': 'yellow',
+                    'transitions': [
+                        {
+                            'event': 'turn_red',
+                            'target': 'red',
+                            'action': lambda: time.sleep(5),
+                        }
+                    ],
+                    'on_entry': lambda: print('Yellow light!'),
+                },
+                {
+                    'name': 'green',
+                    'transitions': [
+                        {
+                            'event': 'turn_yellow',
+                            'target': 'yellow',
+                            'action': lambda: time.sleep(5),
+                        }
+                    ],
+                    'on_entry': lambda: print('Green light!'),
+                },
+            ],
+        }
     )
 
 
