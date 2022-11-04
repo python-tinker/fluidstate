@@ -2,30 +2,31 @@
 
 # import pytest
 
-from fluidstate import StateChart, State, Transition, states
+from fluidstate import StateChart, State, Transition, create_machine
 
 
 class Door(StateChart):
-    states(
-        State(
-            'closed',
-            [Transition(event='open', target='opened')],
-        ),
-        State('opened'),
+    create_machine(
+        {
+            'initial': 'closed',
+            'states': [
+                State(
+                    'closed',
+                    [Transition(event='open', target='opened')],
+                ),
+                State('opened'),
+            ],
+        }
     )
-    initial = 'closed'
 
 
 door = Door()
 door.add_state(State('broken'))
-door.add_transition(
-    Transition(event='crack', target='broken'),
-    state='closed',
-)
+door.add_transition(Transition(event='crack', target='broken'), state='closed')
 
 
 def test_it_responds_to_an_event():
-    assert hasattr(door, 'crack')
+    assert hasattr(door.state, 'crack')
 
 
 def test_event_changes_state_when_called():

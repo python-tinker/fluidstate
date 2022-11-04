@@ -5,8 +5,7 @@ from fluidstate import (
     StateChart,
     State,
     Transition,
-    states,
-    transitions,
+    create_machine,
 )
 
 footsteps = []
@@ -25,23 +24,28 @@ def pre_falling_function():
 
 
 class JumperGuy(StateChart):
-    states(
-        State(
-            'looking',
-            transitions=transitions(
-                Transition(
-                    event='jump',
-                    target='falling',
-                    action=lambda jumper: jumper.append('action jump'),
-                    cond=lambda jumper: jumper.append('guard jump') is None,
-                )
-            ),
-            on_entry=lambda jumper: jumper.append('pre looking'),
-            on_exit=foo.bar,
-        ),
-        State('falling', on_entry=pre_falling_function),
+    create_machine(
+        {
+            'initial': 'looking',
+            'states': [
+                State(
+                    'looking',
+                    transitions=[
+                        Transition(
+                            event='jump',
+                            target='falling',
+                            action=lambda jumper: jumper.append('action jump'),
+                            cond=lambda jumper: jumper.append('guard jump')
+                            is None,
+                        )
+                    ],
+                    on_entry=lambda jumper: jumper.append('pre looking'),
+                    on_exit=foo.bar,
+                ),
+                State('falling', on_entry=pre_falling_function),
+            ],
+        }
     )
-    initial = 'looking'
 
     def __init__(self):
         super().__init__()
@@ -68,20 +72,24 @@ def test_every_callback_is_callable():
 
 def test_deny_state_change_if_guard_callable_returns_false():
     class Door(StateChart):
-        states(
-            State('open'),
-            State(
-                'closed',
-                transitions(
-                    Transition(
-                        event='open',
-                        target='open',
-                        cond=lambda d: not door.locked,
-                    )
-                ),
-            ),
+        create_machine(
+            {
+                'initial': 'closed',
+                'states': [
+                    State('open'),
+                    State(
+                        'closed',
+                        transitions=[
+                            Transition(
+                                event='open',
+                                target='open',
+                                cond=lambda d: not door.locked,
+                            )
+                        ],
+                    ),
+                ],
+            }
         )
-        initial = 'closed'
 
         def locked(self):
             return self.locked

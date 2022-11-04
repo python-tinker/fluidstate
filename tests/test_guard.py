@@ -5,26 +5,29 @@ from fluidstate import (
     StateChart,
     State,
     Transition,
-    states,
-    transitions,
+    create_machine,
 )
 
 
 class FallingMachine(StateChart):
-    states(
-        State(
-            'looking',
-            transitions(
-                Transition(
-                    event='jump',
-                    target='falling',
-                    cond=['ready_to_fly', 'high_enough'],
-                )
-            ),
-        ),
-        State('falling'),
+    create_machine(
+        {
+            'initial': 'looking',
+            'states': [
+                State(
+                    'looking',
+                    transitions=[
+                        Transition(
+                            event='jump',
+                            target='falling',
+                            cond=['ready_to_fly', 'high_enough'],
+                        )
+                    ],
+                ),
+                State('falling'),
+            ],
+        }
     )
-    initial = 'looking'
 
     def __init__(self, ready=True):
         super().__init__()

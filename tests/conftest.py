@@ -1,22 +1,25 @@
 import pytest
 
-from fluidstate import StateChart, State, Transition, states, transitions
+from fluidstate import StateChart, State, Transition, create_machine
 
 
 class SwitchMachine(StateChart):
-
-    initial = 'off'
-    states(
-        State(
-            'off',
-            transitions=[Transition(event='toggle', target='on')],
-            on_entry='inc_off',
-        ),
-        State(
-            'on',
-            transitions=[Transition(event='toggle', target='off')],
-            on_entry='inc_on',
-        ),
+    create_machine(
+        {
+            'initial': 'off',
+            'states': [
+                State(
+                    'off',
+                    transitions=[Transition(event='toggle', target='on')],
+                    on_entry='inc_off',
+                ),
+                State(
+                    'on',
+                    transitions=[Transition(event='toggle', target='off')],
+                    on_entry='inc_on',
+                ),
+            ],
+        }
     )
 
     def __init__(self):
@@ -38,20 +41,24 @@ def switch_machine():
 
 
 class FallingMachine(StateChart):
-    states(
-        State(
-            'looking',
-            transitions(
-                Transition(
-                    event='jump',
-                    target='falling',
-                    cond=['ready_to_fly', 'high_enough'],
-                )
-            ),
-        ),
-        State('falling'),
+    create_machine(
+        {
+            'initial': 'looking',
+            'states': [
+                State(
+                    'looking',
+                    transitions=[
+                        Transition(
+                            event='jump',
+                            target='falling',
+                            cond=['ready_to_fly', 'high_enough'],
+                        )
+                    ],
+                ),
+                State('falling'),
+            ],
+        }
     )
-    initial = 'looking'
 
     def __init__(self, ready=True):
         super().__init__()

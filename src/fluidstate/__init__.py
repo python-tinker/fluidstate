@@ -21,7 +21,17 @@
 """Compact state machine that can be vendored."""
 
 import logging
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    Union,
+    # cast,
+)
 
 __author__ = 'Jesse P. Johnson'
 __author_email__ = 'jpj6652@gmail.com'
@@ -50,8 +60,7 @@ GuardConditions = Union[GuardCondition, Iterable[GuardCondition]]
 StateType = str
 StateTypes = Union[StateType, Iterable[StateType]]
 
-STATES: List['State'] = []
-TRANSITIONS: List['Transition'] = []
+STATE: Optional['State'] = None
 
 
 def transition(arg: Union['Transition', dict]) -> 'Transition':
@@ -67,17 +76,6 @@ def transition(arg: Union['Transition', dict]) -> 'Transition':
     raise InvalidConfig('could not find a valid transition configuration')
 
 
-def transitions(*args: Any, **kwargs: Any) -> List['Transition']:
-    _transitions = list(map(transition, args))
-    # if kwargs.get('update_global', True):
-    #     global TRANSITIONS
-    #     TRANSITIONS.extend(_transitions)
-    #     return TRANSITIONS
-    # else:
-    #     return _transitions
-    return _transitions
-
-
 def state(arg: Union['State', dict, str]) -> 'State':
     if isinstance(arg, State):
         return arg
@@ -88,12 +86,12 @@ def state(arg: Union['State', dict, str]) -> 'State':
             name=arg['name'],
             initial=arg.get('initial'),
             states=(
-                states(arg['states'], update_global=False)
+                states(*arg['states'], update_global=False)
                 if 'states' in arg
                 else []
             ),
             transitions=(
-                transitions(arg['transitions'], update_global=False)
+                transitions(*arg['transitions'], update_global=False)
                 if 'transitions' in arg
                 else []
             ),
@@ -103,18 +101,41 @@ def state(arg: Union['State', dict, str]) -> 'State':
     raise InvalidConfig('could not find a valid state configuration')
 
 
+def transitions(*args: Any, **kwargs: Any) -> List['Transition']:
+    return list(map(transition, args))
+
+
 def states(*args: Any, **kwargs: Any) -> List['State']:
-    _states = list(map(state, args))
-    if kwargs.get('update_global', True):
-        global STATES
-        STATES.extend(_states)
-        return STATES
-    else:
-        return _states
+    return list(map(state, args))
+
+
+def create_machine(config: Dict[str, Any]) -> 'State':
+    global STATE
+    STATE = State(
+        name=config.get('name', 'root'),
+        initial=config.get('initial'),
+        states=states(*config.get('states', [])),
+        transitions=transitions(*config.get('transitions', [])),
+        # **kwargs,
+    )
+    return STATE
 
 
 def tuplize(value: Any) -> Tuple[Any, ...]:
-    return tuple(value) if type(value) in [list, tuple] else (value,)
+    # TODO: tuplize if generator
+    return tuple(value) if type(value) in (list, tuple) else (value,)
+
+
+# class NameDescriptor:
+#     def __get__(
+#         self, obj: object, objtype: Optional[type[object]] = None
+#     ) -> str:
+#         return self.value
+#
+#     def __set__(self, obj: object, value: str) -> None:
+#         if not value.replace('_', '').isalnum():
+#             raise InvalidConfig('state name contains invalid characters')
+#         self.value = value
 
 
 class Action:
@@ -175,6 +196,8 @@ class Guard:
 
 class Transition:
     __slots__ = ['event', 'target', 'action', 'cond']
+    # event = cast(str, NameDescriptor())
+    # target = cast(str, NameDescriptor())
 
     def __init__(
         self,
@@ -225,6 +248,7 @@ class State:
         '__kind',
         '__dict__',
     ]
+    # name = cast(str, NameDescriptor())
     __on_entry: Optional[EventActions]
     __on_exit: Optional[EventActions]
 
@@ -249,7 +273,7 @@ class State:
 
         for x in self.transitions:
             self.__register_transition_callback(x)
-        # self._evaluate_state()
+        # self._validate_state()
 
     def __repr__(self) -> str:
         return repr(f"State({self.name})")
@@ -269,7 +293,7 @@ class State:
             transition.callback().__get__(self, self.__class__),
         )
 
-    # def _evaluate_state(self) -> None:
+    # def _validate_state(self) -> None:
     #     # TODO: empty statemachine should default to null event
     #     if self.kind == 'compund':
     #         if len(self.__states) < 2:
@@ -361,19 +385,11 @@ class MetaStateChart(type):
         bases: Tuple[type, ...],
         attrs: Dict[str, Any],
     ) -> 'MetaStateChart':
-        global STATES, TRANSITIONS
+        global STATE
         obj = super(MetaStateChart, cls).__new__(cls, name, bases, attrs)
-        initial = attrs.get('initial')
-        obj._root = State(
-            name='start',
-            initial=None if callable(initial) else initial,
-            states=STATES,
-            transitions=TRANSITIONS,
-            on_entry=attrs.get('on_entry'),
-            on_exit=attrs.get('on_exit'),
-        )
-        STATES = []
-        TRANSITIONS = []
+        if STATE:
+            obj._root = STATE
+        STATE = None
         return obj
 
 
@@ -395,37 +411,37 @@ class StateChart(metaclass=MetaStateChart):
 
         self.__traverse_states = kwargs.get('traverse_states', False)
 
-        self.__root = self.__class__._root
-        self.__superstate = self.__root
+        if hasattr(self.__class__, '_root'):
+            self.__superstate = self.__root = self.__class__._root
+        else:
+            raise InvalidConfig('There must be at least two states')
+
         # self.__states: Dict[str, 'State'] = {}
         # self.__states.update(self.__class__._states)
         # if states != []:
         #     self.__states.update({s.name: s for s in states})
-        self._evaluate_machine()
-        log.info('loaded states and transitions')
 
-        # XXX: this is rough but workable
         if initial:
             self.initial = initial
-        self.__superstate.initial = (
-            self.initial() if callable(self.initial) else self.initial
+        elif self.superstate.initial:
+            self.initial = self.superstate.initial
+        else:
+            raise InvalidConfig('There must exist an initial state')
+
+        self._validate_machine()
+        log.info('loaded states and transitions')
+
+        # XXX: need to process callable from state with self
+        self.initial = (
+            self.initial(self) if callable(self.initial) else self.initial
         )
-        self.__state = self.get_state(self.__superstate.initial)
+        self.__state = self.get_state(self.initial)
         self.__state._run_on_entry(self)
         log.info('statemachine initialization complete')
 
     def __getattr__(self, name: str) -> Any:
-        # if hasattr(self.__root, name):
-        #     attr = getattr(self.__superstate, name)
-        #     if callable(attr):
-
-        #         def wrapper(*args: Any, **kwargs: Any) -> Any:
-        #             """Call query for data store."""
-        #             return attr(*args, **kwargs)
-
-        #         return wrapper
-        #     else:
-        #         return attr
+        if name == 'initial':
+            raise InvalidConfig('There must exist an initial state')
 
         if name.startswith('is_'):
             try:
@@ -439,26 +455,27 @@ class StateChart(metaclass=MetaStateChart):
         #             return self.__items[name]
 
         try:
-            for x in self.state.transitions:
+            for x in self.transitions + self.state.transitions:
                 if x.event == name:
                     # XXX: need to improve this
                     return x.callback().__get__(self, self.__class__)
+        # TODO: should iterate transitions and throw InvalidTransition on match
         except KeyError as err:
             print(err)
 
         raise AttributeError
 
-    def _evaluate_machine(self) -> None:
+    def _validate_machine(self) -> None:
         # TODO: empty statemachine should default to null event
         if len(self.__root.states) < 2:
             raise InvalidConfig('There must be at least two states')
         if not getattr(self, 'initial', None):
             raise InvalidConfig('There must exist an initial state')
-        log.info('evaluated statemachine')
+        log.info('validated statemachine')
 
     @property
     def transitions(self) -> List['Transition']:
-        return self.state.transitions
+        return self.__superstate.transitions
 
     @property
     def superstate(self) -> 'State':
@@ -466,7 +483,7 @@ class StateChart(metaclass=MetaStateChart):
 
     @property
     def states(self) -> List['State']:
-        return list(self.__superstate.states.values())
+        return list(self.superstate.states.values())
 
     @property
     def state(self) -> 'State':
@@ -503,14 +520,18 @@ class StateChart(metaclass=MetaStateChart):
         parent.add_state(state)
         log.info(f"added state {state.name}")
 
-    def add_transition(self, transition: 'Transition', state: str) -> None:
-        self.get_state(state).add_transition(transition)
+    def add_transition(
+        self, transition: 'Transition', state: Optional[str] = None
+    ) -> None:
+        target = self.get_state(state) if state else self.superstate
+        target.add_transition(transition)
         log.info(f"added transition {transition.event}")
 
     def _process_transitions(
         self, event: str, *args: Any, **kwargs: Any
     ) -> None:
-        _transitions = self.__state.get_transition(event)
+        _transitions = self.superstate.get_transition(event)
+        _transitions += self.state.get_transition(event)
         if _transitions == []:
             raise InvalidTransition('no transitions match event')
         _transition = self.__evaluate_guards(_transitions)

@@ -5,41 +5,46 @@ from fluidstate import (
     StateChart,
     State,
     Transition,
+    create_machine,
     states,
     transitions,
 )
 
 
 class LoanRequest(StateChart):
-    initial = 'pending'
-    states(
-        State(
-            'pending',
-            transitions(
-                Transition(
-                    event='analyze',
-                    target='analyzing',
-                    action='input_data',
-                )
-            ),
-        ),
-        State(
-            'analyzing',
-            transitions(
-                Transition(
-                    event='forward_analysis_result',
-                    cond='was_loan_accepted',
-                    target='accepted',
+    create_machine(
+        {
+            'initial': 'pending',
+            'states': states(
+                State(
+                    'pending',
+                    transitions(
+                        Transition(
+                            event='analyze',
+                            target='analyzing',
+                            action='input_data',
+                        )
+                    ),
                 ),
-                Transition(
-                    event='forward_analysis_result',
-                    cond='was_loan_refused',
-                    target='refused',
+                State(
+                    'analyzing',
+                    transitions(
+                        Transition(
+                            event='forward_analysis_result',
+                            cond='was_loan_accepted',
+                            target='accepted',
+                        ),
+                        Transition(
+                            event='forward_analysis_result',
+                            cond='was_loan_refused',
+                            target='refused',
+                        ),
+                    ),
                 ),
+                State('refused'),
+                State('accepted'),
             ),
-        ),
-        State('refused'),
-        State('accepted'),
+        }
     )
 
     def input_data(self, accepted=True):

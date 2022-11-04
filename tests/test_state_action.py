@@ -1,18 +1,26 @@
-from fluidstate import StateChart, State, Transition, states, transitions
+from fluidstate import (
+    StateChart,
+    State,
+    Transition,
+    create_machine,
+)
 
 
 class ActionMachine(StateChart):
-
-    states(
-        State(
-            'created',
-            transitions(Transition(event='queue', target='waiting')),
-            on_entry='about_to_create',
-            on_exit=['other_on_exit_create', 'on_exit_create'],
-        ),
-        State('waiting', on_entry=['pre_wait', 'other_pre_wait']),
+    create_machine(
+        {
+            'initial': 'created',
+            'states': [
+                State(
+                    'created',
+                    transitions=[Transition(event='queue', target='waiting')],
+                    on_entry='about_to_create',
+                    on_exit=['other_on_exit_create', 'on_exit_create'],
+                ),
+                State('waiting', on_entry=['pre_wait', 'other_pre_wait']),
+            ],
+        }
     )
-    initial = 'created'
 
     def __init__(self):
         self.pre_create = False

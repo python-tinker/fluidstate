@@ -3,25 +3,27 @@ from fluidstate import (
     StateChart,
     State,
     Transition,
-    states,
+    create_machine,
 )
 
 
 class MyMachine(StateChart):
-
-    initial = 'off'
-
-    states(
-        State(
-            'off',
-            transitions=[Transition(event='toggle', target='on')],
-            on_entry='inc_off',
-        ),
-        State(
-            'on',
-            transitions=[Transition(event='toggle', target='off')],
-            on_entry='inc_on',
-        ),
+    create_machine(
+        {
+            'initial': 'off',
+            'states': [
+                State(
+                    'off',
+                    transitions=[Transition(event='toggle', target='on')],
+                    on_entry='inc_off',
+                ),
+                State(
+                    'on',
+                    transitions=[Transition(event='toggle', target='off')],
+                    on_entry='inc_on',
+                ),
+            ],
+        }
     )
 
     def __init__(self):

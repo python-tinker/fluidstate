@@ -1,25 +1,36 @@
 import pytest
 
-from fluidstate import StateChart, State, Transition, states, transitions
+from fluidstate import (
+    StateChart,
+    State,
+    Transition,
+    create_machine,
+    states,
+    transitions,
+)
 
 
 class CrazyGuy(StateChart):
-    states(
-        State(
-            'looking',
-            transitions=transitions(
-                Transition(
-                    event='jump',
-                    target='falling',
-                    action='become_at_risk',
-                    cond='always_can_jump',
+    create_machine(
+        {
+            'initial': 'looking',
+            'states': [
+                State(
+                    'looking',
+                    transitions=transitions(
+                        Transition(
+                            event='jump',
+                            target='falling',
+                            action='become_at_risk',
+                            cond='always_can_jump',
+                        ),
+                    ),
+                    on_exit='no_lookin_anymore',
                 ),
-            ),
-            on_exit='no_lookin_anymore',
-        ),
-        State('falling', on_entry='will_fall_right_now'),
+                State('falling', on_entry='will_fall_right_now'),
+            ],
+        }
     )
-    initial = 'looking'
 
     def __init__(self):
         super().__init__()

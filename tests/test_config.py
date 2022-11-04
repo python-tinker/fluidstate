@@ -4,7 +4,7 @@ from fluidstate import (
     InvalidConfig,
     StateChart,
     State,
-    states,
+    create_machine,
 )
 
 
@@ -17,7 +17,7 @@ def test_it_requires_at_least_two_states():
         MyMachine()
 
     class OtherMachine(StateChart):
-        states(State('open'))
+        create_machine({'states': [State('open')]})
 
     # There must be at least two states
     with pytest.raises(InvalidConfig):
@@ -26,15 +26,19 @@ def test_it_requires_at_least_two_states():
 
 def test_it_requires_an_initial():
     class MyMachine(StateChart):
-        states(State('open'), State('closed'))
+        create_machine({'states': [State('open'), State('closed')]})
 
     # There must be at least two states
     with pytest.raises(InvalidConfig):
         MyMachine()
 
     class AnotherMachine(StateChart):
-        states(State('open'), State('closed'))
-        initial = None
+        create_machine(
+            {
+                'initial': None,
+                'states': [State('open'), State('closed')],
+            }
+        )
 
     # An initial state must exist.
     with pytest.raises(InvalidConfig):

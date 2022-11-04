@@ -1,24 +1,38 @@
-from fluidstate import StateChart, State, Transition, states, transitions
+from fluidstate import (
+    StateChart,
+    State,
+    Transition,
+    create_machine,
+    transitions,
+)
 
 
 class Door(StateChart):
-    states(
-        State(
-            'closed',
-            transitions=transitions(
-                Transition(event='open', target='open', action='open_action')
-            ),
-        ),
-        State(
-            'open',
-            transitions=transitions(
-                Transition(
-                    event='close', target='closed', action='close_action'
-                )
-            ),
-        ),
+    create_machine(
+        {
+            'initial': 'closed',
+            'states': [
+                State(
+                    'closed',
+                    transitions=transitions(
+                        Transition(
+                            event='open', target='open', action='open_action'
+                        )
+                    ),
+                ),
+                State(
+                    'open',
+                    transitions=transitions(
+                        Transition(
+                            event='close',
+                            target='closed',
+                            action='close_action',
+                        )
+                    ),
+                ),
+            ],
+        }
     )
-    initial = 'closed'
 
     def open_action(self, when, where):
         self.when = when

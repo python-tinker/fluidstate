@@ -5,29 +5,33 @@ from fluidstate import (
     StateChart,
     State,
     Transition,
-    states,
+    create_machine,
 )
 
 
 class MyMachine(StateChart):
-    initial = 'created'
-    states(
-        State(
-            'created',
-            transitions=[
-                Transition(event='queue', target='waiting'),
-                Transition(event='cancel', target='cancelled'),
+    create_machine(
+        {
+            'initial': 'created',
+            'states': [
+                State(
+                    'created',
+                    transitions=[
+                        Transition(event='queue', target='waiting'),
+                        Transition(event='cancel', target='cancelled'),
+                    ],
+                ),
+                State(
+                    'waiting',
+                    transitions=[
+                        Transition(event='process', target='processed'),
+                        Transition(event='cancel', target='cancelled'),
+                    ],
+                ),
+                State('processed'),
+                State('cancelled'),
             ],
-        ),
-        State(
-            'waiting',
-            transitions=[
-                Transition(event='process', target='processed'),
-                Transition(event='cancel', target='cancelled'),
-            ],
-        ),
-        State('processed'),
-        State('cancelled'),
+        }
     )
 
 
