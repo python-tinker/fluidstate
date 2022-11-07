@@ -312,21 +312,22 @@ class State:
         self.__initial = state
         if self.__state == self:
             self.__state = next(
-                (v for k, v in self.states.items() if self.initial == k), self
+                (v for k, v in self.substates.items() if self.initial == k),
+                self,
             )
 
     @property
     def kind(self) -> str:
         if self.__kind:
             kind = self.__kind
-        # elif self.states != [] and self.transitions != []:
+        # elif self.substates != [] and self.transitions != []:
         #     for x in self.transitions:
         #         if x == '':
         #             kind = 'transient'
         #             break
         #     else:
         #         kind = 'compound'
-        elif self.states != []:
+        elif self.substates != []:
             kind = 'compound'
             # states:
             #   - parallel
@@ -339,11 +340,11 @@ class State:
         return kind
 
     @property
-    def state(self) -> 'State':
+    def substate(self) -> 'State':
         return self.__state
 
     @property
-    def states(self) -> Dict[str, 'State']:
+    def substates(self) -> Dict[str, 'State']:
         return self.__states
 
     @property
@@ -365,7 +366,6 @@ class State:
         )
 
     def _run_on_entry(self, machine: 'StateChart') -> None:
-        print(self.transitions)
         if self.__on_entry is not None:
             Action(machine).run(self.__on_entry)
             log.info(
@@ -470,7 +470,7 @@ class StateChart(metaclass=MetaStateChart):
 
     def _validate_machine(self) -> None:
         # TODO: empty statemachine should default to null event
-        if len(self.__root.states) < 2:
+        if len(self.__root.substates) < 2:
             raise InvalidConfig('There must be at least two states')
         if not getattr(self, 'initial', None):
             raise InvalidConfig('There must exist an initial state')
@@ -486,7 +486,7 @@ class StateChart(metaclass=MetaStateChart):
 
     @property
     def states(self) -> List['State']:
-        return list(self.superstate.states.values())
+        return list(self.superstate.substates.values())
 
     @property
     def state(self) -> 'State':
@@ -500,7 +500,8 @@ class StateChart(metaclass=MetaStateChart):
         paths = query.split('.')
         current = self.state if query.startswith('.') else self.__root
         for i, state in enumerate(paths):
-            current = current if current == state else current.states[state]
+            if current != state:
+                current = current.substates[state]
             if i == (len(paths) - 1):
                 log.info(f"found state '{current.name}'")
                 return current
