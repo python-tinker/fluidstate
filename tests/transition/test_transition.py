@@ -3,8 +3,6 @@ import pytest
 from fluidstate import (
     # InvalidTransition,
     StateChart,
-    State,
-    Transition,
     create_machine,
 )
 
@@ -14,22 +12,22 @@ class MyMachine(StateChart):
         {
             'initial': 'created',
             'states': [
-                State(
-                    'created',
-                    transitions=[
-                        Transition(event='queue', target='waiting'),
-                        Transition(event='cancel', target='cancelled'),
+                {
+                    'name': 'created',
+                    'transitions': [
+                        {'event': 'queue', 'target': 'waiting'},
+                        {'event': 'cancel', 'target': 'cancelled'},
                     ],
-                ),
-                State(
-                    'waiting',
-                    transitions=[
-                        Transition(event='process', target='processed'),
-                        Transition(event='cancel', target='cancelled'),
+                },
+                {
+                    'name': 'waiting',
+                    'transitions': [
+                        {'event': 'process', 'target': 'processed'},
+                        {'event': 'cancel', 'target': 'cancelled'},
                     ],
-                ),
-                State('processed'),
-                State('cancelled'),
+                },
+                {'name': 'processed'},
+                {'name': 'cancelled'},
             ],
         }
     )
@@ -42,7 +40,7 @@ def test_its_declaration_creates_a_method_with_its_name():
     machine.queue()
 
 
-def test_it_changes_machine_State():
+def test_it_changes_machine_state():
     machine = MyMachine()
     assert machine.state == 'created'
     machine.queue()

@@ -287,9 +287,10 @@ class State:
 
     def __register_transition_callback(self, transition: 'Transition') -> None:
         # XXX: currently mapping to state instead of instance
+        # TODO: need way to provide auto-transition
         setattr(
             self,
-            transition.event,
+            transition.event if transition.event != '' else '_transit_',
             transition.callback().__get__(self, self.__class__),
         )
 
@@ -364,6 +365,7 @@ class State:
         )
 
     def _run_on_entry(self, machine: 'StateChart') -> None:
+        print(self.transitions)
         if self.__on_entry is not None:
             Action(machine).run(self.__on_entry)
             log.info(
@@ -437,6 +439,7 @@ class StateChart(metaclass=MetaStateChart):
         )
         self.__state = self.get_state(self.initial)
         self.__state._run_on_entry(self)
+        self.__process_transient_state()
         log.info('statemachine initialization complete')
 
     def __getattr__(self, name: str) -> Any:
@@ -455,8 +458,8 @@ class StateChart(metaclass=MetaStateChart):
         #             return self.__items[name]
 
         try:
-            for x in self.transitions + self.state.transitions:
-                if x.event == name:
+            for x in self.state.transitions:
+                if x.event == name or (x.event == '' and name == '_transit_'):
                     # XXX: need to improve this
                     return x.callback().__get__(self, self.__class__)
         # TODO: should iterate transitions and throw InvalidTransition on match
@@ -497,7 +500,7 @@ class StateChart(metaclass=MetaStateChart):
         paths = query.split('.')
         current = self.state if query.startswith('.') else self.__root
         for i, state in enumerate(paths):
-            current = current.states[state]
+            current = current if current == state else current.states[state]
             if i == (len(paths) - 1):
                 log.info(f"found state '{current.name}'")
                 return current
@@ -513,6 +516,7 @@ class StateChart(metaclass=MetaStateChart):
         self.state._run_on_exit(self)
         self.__state = self.get_state(state)
         self.state._run_on_entry(self)
+        self.__process_transient_state()
         log.info(f"changed state to {state}")
 
     def add_state(self, state: 'State', query: Optional[str] = None) -> None:
@@ -530,12 +534,16 @@ class StateChart(metaclass=MetaStateChart):
     def _process_transitions(
         self, event: str, *args: Any, **kwargs: Any
     ) -> None:
-        _transitions = self.superstate.get_transition(event)
-        _transitions += self.state.get_transition(event)
+        _transitions = self.state.get_transition(event)
         if _transitions == []:
             raise InvalidTransition('no transitions match event')
         _transition = self.__evaluate_guards(_transitions)
         _transition.run(self, *args, **kwargs)
+
+    def __process_transient_state(self) -> None:
+        for x in self.state.transitions:
+            if x.event == '':
+                self._transit_()
 
     def __evaluate_guards(
         self, transitions: List['Transition']
