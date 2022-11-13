@@ -10,6 +10,7 @@ class StopLight(StateChart):
 
     create_machine(
         {
+            'name': 'stoplight',
             'initial': 'red',
             'states': [
                 {

@@ -1,6 +1,6 @@
 import pytest
 
-from fluidstate import StateChart, State, Transition, create_machine
+from fluidstate import StateChart, create_machine
 
 
 class SwitchMachine(StateChart):
@@ -8,16 +8,16 @@ class SwitchMachine(StateChart):
         {
             'initial': 'off',
             'states': [
-                State(
-                    'off',
-                    transitions=[Transition(event='toggle', target='on')],
-                    on_entry='inc_off',
-                ),
-                State(
-                    'on',
-                    transitions=[Transition(event='toggle', target='off')],
-                    on_entry='inc_on',
-                ),
+                {
+                    'name': 'off',
+                    'transitions': [{'event': 'toggle', 'target': 'on'}],
+                    'on_entry': 'inc_off',
+                },
+                {
+                    'name': 'on',
+                    'transitions': [{'event': 'toggle', 'target': 'off'}],
+                    'on_entry': 'inc_on',
+                },
             ],
         }
     )
@@ -45,17 +45,17 @@ class FallingMachine(StateChart):
         {
             'initial': 'looking',
             'states': [
-                State(
-                    'looking',
-                    transitions=[
-                        Transition(
-                            event='jump',
-                            target='falling',
-                            cond=['ready_to_fly', 'high_enough'],
-                        )
+                {
+                    'name': 'looking',
+                    'transitions': [
+                        {
+                            'event': 'jump',
+                            'target': 'falling',
+                            'cond': ['ready_to_fly', 'high_enough'],
+                        }
                     ],
-                ),
-                State('falling'),
+                },
+                {'name': 'falling'},
             ],
         }
     )

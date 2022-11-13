@@ -1,12 +1,6 @@
 import pytest
 
-from fluidstate import (
-    GuardNotSatisfied,
-    StateChart,
-    State,
-    Transition,
-    create_machine,
-)
+from fluidstate import GuardNotSatisfied, StateChart, create_machine
 
 footsteps = []
 
@@ -28,21 +22,25 @@ class JumperGuy(StateChart):
         {
             'initial': 'looking',
             'states': [
-                State(
-                    'looking',
-                    transitions=[
-                        Transition(
-                            event='jump',
-                            target='falling',
-                            action=lambda jumper: jumper.append('action jump'),
-                            cond=lambda jumper: jumper.append('guard jump')
-                            is None,
-                        )
+                {
+                    'name': 'looking',
+                    'transitions': [
+                        {
+                            'event': 'jump',
+                            'target': 'falling',
+                            'action': (
+                                lambda jumper: jumper.append('action jump')
+                            ),
+                            'cond': (
+                                lambda jumper: jumper.append('guard jump')
+                                is None
+                            ),
+                        }
                     ],
-                    on_entry=lambda jumper: jumper.append('pre looking'),
-                    on_exit=foo.bar,
-                ),
-                State('falling', on_entry=pre_falling_function),
+                    'on_entry': lambda jumper: jumper.append('pre looking'),
+                    'on_exit': foo.bar,
+                },
+                {'name': 'falling', 'on_entry': pre_falling_function},
             ],
         }
     )
@@ -76,17 +74,17 @@ def test_deny_state_change_if_guard_callable_returns_false():
             {
                 'initial': 'closed',
                 'states': [
-                    State('open'),
-                    State(
-                        'closed',
-                        transitions=[
-                            Transition(
-                                event='open',
-                                target='open',
-                                cond=lambda d: not door.locked,
-                            )
+                    {'name': 'open'},
+                    {
+                        'name': 'closed',
+                        'transitions': [
+                            {
+                                'event': 'open',
+                                'target': 'open',
+                                'cond': lambda d: not door.locked,
+                            }
                         ],
-                    ),
+                    },
                 ],
             }
         )

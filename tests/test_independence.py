@@ -1,10 +1,4 @@
-from fluidstate import (
-    # InvalidTransition
-    StateChart,
-    State,
-    Transition,
-    create_machine,
-)
+from fluidstate import StateChart, create_machine
 
 
 class MyMachine(StateChart):
@@ -12,16 +6,16 @@ class MyMachine(StateChart):
         {
             'initial': 'off',
             'states': [
-                State(
-                    'off',
-                    transitions=[Transition(event='toggle', target='on')],
-                    on_entry='inc_off',
-                ),
-                State(
-                    'on',
-                    transitions=[Transition(event='toggle', target='off')],
-                    on_entry='inc_on',
-                ),
+                {
+                    'name': 'off',
+                    'transitions': [{'event': 'toggle', 'target': 'on'}],
+                    'on_entry': 'inc_off',
+                },
+                {
+                    'name': 'on',
+                    'transitions': [{'event': 'toggle', 'target': 'off'}],
+                    'on_entry': 'inc_on',
+                },
             ],
         }
     )

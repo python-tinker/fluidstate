@@ -1,6 +1,6 @@
 # import pytest
 
-from fluidstate import StateChart, State, Transition, create_machine
+from fluidstate import StateChart, create_machine
 
 
 def test_it_defines_states():
@@ -8,7 +8,11 @@ def test_it_defines_states():
         create_machine(
             {
                 'initial': 'read',
-                'states': [State('unread'), State('read'), State('closed')],
+                'states': [
+                    {'name': 'unread'},
+                    {'name': 'read'},
+                    {'name': 'closed'},
+                ],
             }
         )
 
@@ -22,7 +26,7 @@ def test_it_has_an_initial():
         create_machine(
             {
                 'initial': 'closed',
-                'states': [State('open'), State('closed')],
+                'states': [{'name': 'open'}, {'name': 'closed'}],
             }
         )
 
@@ -37,15 +41,17 @@ def test_it_defines_states_using_method_calls():
             {
                 'initial': 'unread',
                 'states': [
-                    State(
-                        'unread',
-                        [Transition(event='read', target='read')],
-                    ),
-                    State(
-                        'read',
-                        [Transition(event='close', target='closed')],
-                    ),
-                    State('closed'),
+                    {
+                        'name': 'unread',
+                        'transitions': [{'event': 'read', 'target': 'read'}],
+                    },
+                    {
+                        'name': 'read',
+                        'transitions': [
+                            {'event': 'close', 'target': 'closed'}
+                        ],
+                    },
+                    {'name': 'closed'},
                 ],
             }
         )
@@ -59,11 +65,13 @@ def test_it_defines_states_using_method_calls():
             {
                 'initial': 'idle',
                 'states': [
-                    State(
-                        'idle',
-                        [Transition(event='work', target='working')],
-                    ),
-                    State('working'),
+                    {
+                        'name': 'idle',
+                        'transitions': [
+                            {'event': 'work', 'target': 'working'}
+                        ],
+                    },
+                    {'name': 'working'},
                 ],
             }
         )
@@ -86,7 +94,7 @@ def test_its_initial_may_be_a_callable():
                     and 'awake'
                     or 'sleeping'
                 ),
-                'states': [State('awake'), State('sleeping')],
+                'states': [{'name': 'awake'}, {'name': 'sleeping'}],
             }
         )
 

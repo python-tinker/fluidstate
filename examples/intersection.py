@@ -2,49 +2,51 @@
 
 import time
 
-from fluidstate import StateChart, create_machine
+from fluidstate import StateChart, State, create_machine
 
 
-stoplight = create_machine(
-    {
-        'initial': 'red',
-        'states': [
-            {
-                'name': 'red',
-                'transitions': [
-                    {
-                        'event': 'turn_green',
-                        'target': 'green',
-                        'action': lambda: time.sleep(5),
-                    }
-                ],
-                'on_entry': lambda: print('Red Light!'),
-            },
-            {
-                'name': 'yellow',
-                'transitions': [
-                    {
-                        'event': 'turn_red',
-                        'target': 'red',
-                        'action': lambda: time.sleep(5),
-                    }
-                ],
-                'on_entry': lambda: print('Yellow light!'),
-            },
-            {
-                'name': 'green',
-                'transitions': [
-                    {
-                        'event': 'turn_yellow',
-                        'target': 'yellow',
-                        'action': lambda: time.sleep(2),
-                    }
-                ],
-                'on_entry': lambda: print('Green light!'),
-            },
-        ],
-    }
-)
+def get_stoplight(name: str, initial: str = 'red') -> State:
+    return create_machine(
+        {
+            'name': name,
+            'initial': initial,
+            'states': [
+                {
+                    'name': 'red',
+                    'transitions': [
+                        {
+                            'event': 'turn_green',
+                            'target': 'green',
+                            'action': lambda: time.sleep(5),
+                        }
+                    ],
+                    'on_entry': lambda: print('Red Light!'),
+                },
+                {
+                    'name': 'yellow',
+                    'transitions': [
+                        {
+                            'event': 'turn_red',
+                            'target': 'red',
+                            'action': lambda: time.sleep(5),
+                        }
+                    ],
+                    'on_entry': lambda: print('Yellow light!'),
+                },
+                {
+                    'name': 'green',
+                    'transitions': [
+                        {
+                            'event': 'turn_yellow',
+                            'target': 'yellow',
+                            'action': lambda: time.sleep(2),
+                        }
+                    ],
+                    'on_entry': lambda: print('Green light!'),
+                },
+            ],
+        }
+    )
 
 
 class Intersection(StateChart):
@@ -52,32 +54,11 @@ class Intersection(StateChart):
 
     create_machine(
         {
-            'initial': 'east_west',
+            'name': 'intersection',
+            'kind': 'parallel',
             'states': [
-                {
-                    'name': 'north_south',
-                    'transitions': [
-                        {
-                            'event': 'allow_east_west',
-                            'target': 'east_west',
-                            'action': '_change_green',
-                        }
-                    ],
-                    'on_exit': '_change_red',
-                    'states': [stoplight],
-                },
-                {
-                    'name': 'east_west',
-                    'transitions': [
-                        {
-                            'event': 'allow_north_south',
-                            'target': 'north_south',
-                            'action': '_change_green',
-                        }
-                    ],
-                    'on_exit': '_change_red',
-                    'states': [stoplight],
-                },
+                get_stoplight('north_sourth', 'red'),
+                get_stoplight('east_west', 'green'),
             ],
         }
     )

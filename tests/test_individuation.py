@@ -10,18 +10,18 @@ class Door(StateChart):
         {
             'initial': 'closed',
             'states': [
-                State(
-                    'closed',
-                    [Transition(event='open', target='opened')],
-                ),
-                State('opened'),
+                {
+                    'name': 'closed',
+                    'transitions': [{'event': 'open', 'target': 'opened'}],
+                },
+                {'name': 'opened'},
             ],
         }
     )
 
 
 door = Door()
-door.add_state(State('broken'))
+door.add_state(State(name='broken'))
 door.add_transition(Transition(event='crack', target='broken'), state='closed')
 
 

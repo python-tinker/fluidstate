@@ -6,7 +6,10 @@ class JumperGuy(StateChart):
         {
             'initial': 'looking',
             'states': [
-                State('looking', [Transition(event='jump', target='falling')]),
+                State(
+                    'looking',
+                    transitions=[Transition(event='jump', target='falling')],
+                ),
                 State('falling'),
             ],
         }

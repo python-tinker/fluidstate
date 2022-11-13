@@ -1,9 +1,4 @@
-from fluidstate import (
-    StateChart,
-    State,
-    Transition,
-    create_machine,
-)
+from fluidstate import StateChart, create_machine
 
 
 class ActionMachine(StateChart):
@@ -11,13 +6,16 @@ class ActionMachine(StateChart):
         {
             'initial': 'created',
             'states': [
-                State(
-                    'created',
-                    transitions=[Transition(event='queue', target='waiting')],
-                    on_entry='about_to_create',
-                    on_exit=['other_on_exit_create', 'on_exit_create'],
-                ),
-                State('waiting', on_entry=['pre_wait', 'other_pre_wait']),
+                {
+                    'name': 'created',
+                    'transitions': [{'event': 'queue', 'target': 'waiting'}],
+                    'on_entry': 'about_to_create',
+                    'on_exit': ['other_on_exit_create', 'on_exit_create'],
+                },
+                {
+                    'name': 'waiting',
+                    'on_entry': ['pre_wait', 'other_pre_wait'],
+                },
             ],
         }
     )

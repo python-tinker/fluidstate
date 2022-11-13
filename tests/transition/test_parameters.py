@@ -1,10 +1,4 @@
-from fluidstate import (
-    StateChart,
-    State,
-    Transition,
-    create_machine,
-    transitions,
-)
+from fluidstate import StateChart, create_machine
 
 
 class Door(StateChart):
@@ -12,24 +6,26 @@ class Door(StateChart):
         {
             'initial': 'closed',
             'states': [
-                State(
-                    'closed',
-                    transitions=transitions(
-                        Transition(
-                            event='open', target='open', action='open_action'
-                        )
-                    ),
-                ),
-                State(
-                    'open',
-                    transitions=transitions(
-                        Transition(
-                            event='close',
-                            target='closed',
-                            action='close_action',
-                        )
-                    ),
-                ),
+                {
+                    'name': 'closed',
+                    'transitions': [
+                        {
+                            'event': 'open',
+                            'target': 'open',
+                            'action': 'open_action',
+                        }
+                    ],
+                },
+                {
+                    'name': 'open',
+                    'transitions': [
+                        {
+                            'event': 'close',
+                            'target': 'closed',
+                            'action': 'close_action',
+                        }
+                    ],
+                },
             ],
         }
     )

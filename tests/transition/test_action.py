@@ -1,30 +1,23 @@
-from fluidstate import (
-    StateChart,
-    State,
-    Transition,
-    create_machine,
-    states,
-    transitions,
-)
+from fluidstate import StateChart, create_machine
 
 
 class CrazyGuy(StateChart):
     create_machine(
         {
             'initial': 'looking',
-            'states': states(
-                State(
-                    'looking',
-                    transitions(
-                        Transition(
-                            event='jump',
-                            target='falling',
-                            action=['become_at_risk', 'accelerate'],
-                        )
-                    ),
-                ),
-                State('falling'),
-            ),
+            'states': [
+                {
+                    'name': 'looking',
+                    'transitions': [
+                        {
+                            'event': 'jump',
+                            'target': 'falling',
+                            'action': ['become_at_risk', 'accelerate'],
+                        }
+                    ],
+                },
+                {'name': 'falling'},
+            ],
         }
     )
 

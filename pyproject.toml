@@ -87,8 +87,7 @@ exclude = '''
     | \.git
     | \.mypy_cache
     | \.pytest_cache
-    | \.vagrant
-    | _build
+    | build
     | dist
   )
 )

@@ -1,12 +1,6 @@
 import pytest
 
-from fluidstate import (
-    GuardNotSatisfied,
-    StateChart,
-    State,
-    Transition,
-    create_machine,
-)
+from fluidstate import GuardNotSatisfied, StateChart, create_machine
 
 
 class FallingMachine(StateChart):
@@ -14,17 +8,17 @@ class FallingMachine(StateChart):
         {
             'initial': 'looking',
             'states': [
-                State(
-                    'looking',
-                    transitions=[
-                        Transition(
-                            event='jump',
-                            target='falling',
-                            cond=['ready_to_fly', 'high_enough'],
-                        )
+                {
+                    'name': 'looking',
+                    'transitions': [
+                        {
+                            'event': 'jump',
+                            'target': 'falling',
+                            'cond': ['ready_to_fly', 'high_enough'],
+                        }
                     ],
-                ),
-                State('falling'),
+                },
+                {'name': 'falling'},
             ],
         }
     )

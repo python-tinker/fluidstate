@@ -9,27 +9,32 @@ Compact statechart that can be vendored.
 A very simple example taken from specs.
 
 ```python
->>> from fluidstate import StateChart, State, Transition, states, transitions
+>>> from fluidstate import StateChart, create_machine
 
 >>> class SimpleMachine(StateChart):
-...     initial = 'created'
-...     states(
-...         State(
-...             'created',
-...             transitions(
-...                 Transition(event='queue', target='waiting'),
-...                 Transition(event='cancel', target='canceled'),
-...             ),
-...         ),
-...         State(
-...             'waiting',
-...             transitions(
-...                 Transition(event='process', target='processed'),
-...                 Transition(event='cancel', target='canceled'),
-...             )
-...         ),
-...         State('processed'),
-...         State('canceled'),
+...     create_machine(
+...         {
+...             'name': 'machine',
+...             'initial': 'created',
+...             'states': [
+...                 {
+...                     'name': 'created',
+...                     'transitions': [
+...                         {'event': 'queue', 'target': 'waiting'},
+...                         {'event': 'cancel', 'target': 'canceled'},
+...                     ],
+...                 },
+...                 {
+...                     'name': 'waiting',
+...                     'transitions': [
+...                         {'event': 'process', 'target': 'processed'},
+...                         {'event': 'cancel', 'target': 'canceled'},
+...                     ]
+...                 },
+...                 {'name': 'processed'},
+...                 {'name': 'canceled'},
+...             ]
+...         }
 ...     )
 
 >>> machine = SimpleMachine()
@@ -56,6 +61,7 @@ A very simple example taken from specs.
 
 >>> cancel_machine.state
 'State(canceled)'
+
 ```
 
 
@@ -64,40 +70,44 @@ A very simple example taken from specs.
 For demonstrating more advanced capabilities::
 
 ```python
->>> from fluidstate import (
-...     StateChart,
-...     State,
-...     Transition,
-...     states,
-...     transitions,
-... )
+>>> from fluidstate import StateChart, create_machine
 
 >>> class Relationship(StateChart):
-...     initial = 'dating'
-...     states(
-...         State(
-...             name='dating',
-...             transitions=transitions(
-...                 Transition(
-...                     event='get_intimate', target='intimate', cond='drunk'
-...                 )
-...             ),
-...             on_entry='make_happy',
-...             on_exit='make_depressed',
-...         ),
-...         State(
-...             name='intimate',
-...             transitions=transitions(
-...                 Transition(
-...                     event='get_married',
-...                     target='married',
-...                     cond='willing_to_give_up_manhood',
-...                 )
-...             ),
-...             on_entry='make_very_happy',
-...             on_exit='never_speak_again',
-...         ),
-...         State(name='married', on_entry='give_up_intimacy', on_exit='buy_exotic_car')
+...     create_machine(
+...         {
+...             'initial': 'dating',
+...             'states': [
+...                 {
+...                     'name': 'dating',
+...                     'transitions': [
+...                         {
+...                             'event': 'get_intimate',
+...                             'target': 'intimate',
+...                             'cond': 'drunk',
+...                         }
+...                     ],
+...                     'on_entry': 'make_happy',
+...                     'on_exit': 'make_depressed',
+...                 },
+...                 {
+...                     'name': 'intimate',
+...                     'transitions': [
+...                         {
+...                             'event': 'get_married',
+...                             'target': 'married',
+...                             'cond': 'willing_to_give_up_manhood',
+...                         }
+...                     ],
+...                     'on_entry': 'make_very_happy',
+...                     'on_exit': 'never_speak_again',
+...                 },
+...                 {
+...                     'name': 'married',
+...                     'on_entry': 'give_up_intimacy',
+...                     'on_exit': 'buy_exotic_car',
+...                 }
+...             ]
+...         }
 ...     )
 
 ...     def strictly_for_fun(self) -> None:
@@ -127,7 +137,8 @@ For demonstrating more advanced capabilities::
 ...     def buy_exotic_car(self) -> None:
 ...         pass
 
->>> relationship = Relationship()
+# >>> relationship = Relationship()
+
 ```
 
 

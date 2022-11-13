@@ -1,13 +1,6 @@
 import pytest
 
-from fluidstate import (
-    StateChart,
-    State,
-    Transition,
-    create_machine,
-    states,
-    transitions,
-)
+from fluidstate import StateChart, create_machine
 
 
 class CrazyGuy(StateChart):
@@ -15,19 +8,19 @@ class CrazyGuy(StateChart):
         {
             'initial': 'looking',
             'states': [
-                State(
-                    'looking',
-                    transitions=transitions(
-                        Transition(
-                            event='jump',
-                            target='falling',
-                            action='become_at_risk',
-                            cond='always_can_jump',
-                        ),
-                    ),
-                    on_exit='no_lookin_anymore',
-                ),
-                State('falling', on_entry='will_fall_right_now'),
+                {
+                    'name': 'looking',
+                    'transitions': [
+                        {
+                            'event': 'jump',
+                            'target': 'falling',
+                            'action': 'become_at_risk',
+                            'cond': 'always_can_jump',
+                        },
+                    ],
+                    'on_exit': 'no_lookin_anymore',
+                },
+                {'name': 'falling', 'on_entry': 'will_fall_right_now'},
             ],
         }
     )
