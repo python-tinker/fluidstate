@@ -20,6 +20,7 @@
 
 """Compact state machine that can be vendored."""
 
+import inspect
 import logging
 from copy import deepcopy
 from typing import (
@@ -54,25 +55,25 @@ __all__ = (
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
-EventAction = Union[str, Callable]
+EventAction = Union[Callable, str]
 EventActions = Union[EventAction, Iterable[EventAction]]
-GuardCondition = Union[str, Callable]
+GuardCondition = Union[Callable, str]
 GuardConditions = Union[GuardCondition, Iterable[GuardCondition]]
-StateType = str
-StateTypes = Union[StateType, Iterable[StateType]]
+InitialType = Union[Callable, str]
 
 STATE: Optional['State'] = None
+# enable_signature_truncation = False
 
 
-def transition(arg: Union['Transition', dict]) -> 'Transition':
-    if isinstance(arg, Transition):
-        return arg
-    if isinstance(arg, dict):
+def transition(config: Union['Transition', dict]) -> 'Transition':
+    if isinstance(config, Transition):
+        return config
+    if isinstance(config, dict):
         return Transition(
-            event=arg['event'],
-            target=arg['target'],
-            action=arg.get('action'),
-            cond=arg.get('cond'),
+            event=config['event'],
+            target=config['target'],
+            action=config.get('action'),
+            cond=config.get('cond'),
         )
     raise InvalidConfig('could not find a valid transition configuration')
 
@@ -83,7 +84,8 @@ def state(config: Union['State', dict, str]) -> 'State':
     elif isinstance(config, str):
         return State(config)
     elif isinstance(config, dict):
-        return State(
+        cls = config.get('factory', State)
+        return cls(
             name=config['name'],
             initial=config.get('initial'),
             kind=config.get('kind'),
@@ -114,7 +116,7 @@ def states(*args: Any, **kwargs: Any) -> List['State']:
 def create_machine(config: Dict[str, Any], **kwargs: Any) -> 'State':
     global STATE
     cls = kwargs.get('factory', State)
-    STATE = cls(
+    _state = cls(
         name=config.get('name', 'root'),
         initial=config.get('initial'),
         kind=config.get('kind'),
@@ -122,7 +124,8 @@ def create_machine(config: Dict[str, Any], **kwargs: Any) -> 'State':
         transitions=transitions(*config.get('transitions', [])),
         **kwargs,
     )
-    return STATE
+    STATE = _state
+    return _state
 
 
 def tuplize(value: Any) -> Tuple[Any, ...]:
@@ -169,10 +172,11 @@ class Action:
 
     @staticmethod
     def __run_with_args(action: Callable, *args: Any, **kwargs: Any) -> None:
-        # FIXME: try is needed here due to passing self to function or methods
-        try:
+        # TODO: need to comform with https://peps.python.org/pep-0570/
+        signature = inspect.signature(action)
+        if len(signature.parameters.keys()) != 0:
             action(*args, **kwargs)
-        except TypeError:
+        else:
             action()
 
 
@@ -207,11 +211,18 @@ class Guard:
     def __evaluate_with_args(
         cond: Callable, *args: Any, **kwargs: Any
     ) -> bool:
-        # FIXME: try is needed here due to passing self to function or methods
-        try:
-            return cond(*args, **kwargs)
-        except TypeError:
-            return cond()
+        signature = inspect.signature(cond)
+        params = dict(signature.parameters)
+
+        if len(params.keys()) != 0:
+            _kwargs = {k: v for k, v in kwargs.items() if k in params.keys()}
+            _args = tuple(
+                x
+                for i, x in enumerate(params.keys())
+                if i < (len(params.keys()) - len(_kwargs.keys()))
+            )
+            return cond(*_args, **_kwargs)
+        return cond()
 
 
 class Transition:
@@ -273,6 +284,7 @@ class State:
         '__dict__',
     ]
     # name = cast(str, NameDescriptor())
+    __initial: Optional[InitialType]
     __on_entry: Optional[EventActions]
     __on_exit: Optional[EventActions]
 
@@ -307,7 +319,7 @@ class State:
         self.__on_entry = kwargs.get('on_entry')
         self.__on_exit = kwargs.get('on_exit')
 
-        # self.__validate_state()
+        self.__validate_state()
 
     def __repr__(self) -> str:
         return repr(f"State({self.name})")
@@ -328,23 +340,23 @@ class State:
             transition.callback().__get__(self, self.__class__),
         )
 
-    # def __validate_state(self) -> None:
-    #     # TODO: empty statemachine should default to null event
-    #     if self.initial and self.kind == 'parallel:
-    #         raise InvalidConfig(
-    #             'parallel state should not have an initial state'
-    #         )
-    #     if self.kind == 'compund':
-    #         if len(self.__states) < 2:
-    #             raise InvalidConfig('There must be at least two states')
-    #         if not self.initial:
-    #             raise InvalidConfig('There must exist an initial state')
-    #     if self.kind == 'final' and self.__on_exit:
-    #         log.warning('final state will never run "on_exit" action')
-    #     log.info('evaluated state')
+    def __validate_state(self) -> None:
+        # TODO: empty statemachine should default to null event
+        if self.kind == 'compund':
+            if len(self.__states) < 2:
+                raise InvalidConfig('There must be at least two states')
+            if not self.initial:
+                raise InvalidConfig('There must exist an initial state')
+        if self.initial and self.kind == 'parallel':
+            raise InvalidConfig(
+                'parallel state should not have an initial state'
+            )
+        if self.kind == 'final' and self.__on_exit:
+            log.warning('final state will never run "on_exit" action')
+        log.info('evaluated state')
 
     @property
-    def initial(self) -> Optional[str]:
+    def initial(self) -> Optional[InitialType]:
         """Return initial substate if defined."""
         return self.__initial
 
@@ -438,8 +450,7 @@ class MetaStateChart(type):
 
 
 class StateChart(metaclass=MetaStateChart):
-    __slots__ = ['initial', '__states', '__dict__']
-    initial: Union[Callable, str]
+    __slots__ = ['__states', '__dict__']
 
     def __init__(
         self,
@@ -458,17 +469,18 @@ class StateChart(metaclass=MetaStateChart):
                 log.setLevel(kwargs['logging_level'].upper())
         log.info('initializing statemachine')
 
-        self.__traverse_states = kwargs.get('traverse_states', False)
+        # self.__traverse_states = kwargs.get('traverse_states', False)
 
         if hasattr(self.__class__, '_root'):
             self.__state = self.__superstate = self.__root = deepcopy(
                 self.__class__._root
             )
         else:
-            raise InvalidConfig('There must be at least two states')
+            raise InvalidConfig(
+                'attempted initialization with empty superstate'
+            )
 
-        self.__setup_initial(initial)
-        self.__validate_machine()
+        self.__process_initial(initial or self.superstate.initial)
         log.info('loaded states and transitions')
 
         if kwargs.get('enable_start_transition', True):
@@ -480,11 +492,12 @@ class StateChart(metaclass=MetaStateChart):
         if name.startswith('__'):
             raise AttributeError
 
-        if name == 'initial':
-            raise InvalidConfig('There must exist an initial state')
-
         if name.startswith('is_'):
             return self.__state.name == name[3:]
+
+        # for key in list(self.states):
+        #     if key == name:
+        #         return self.__items[name]
 
         for x in (
             self.state.transitions + self.superstate.transitions
@@ -498,39 +511,15 @@ class StateChart(metaclass=MetaStateChart):
 
         raise AttributeError
 
-    def __setup_initial(
-        self, initial: Optional[Union[str, Callable]] = None
-    ) -> None:
-        if initial:
-            self.initial = initial
-        elif self.superstate.initial:
-            self.initial = self.superstate.initial
-        else:
-            self.initial = None
-
-        if self.initial:
-            # XXX: need to process callable from state with self
-            self.initial = (
-                self.initial(self) if callable(self.initial) else self.initial
-            )
-            self.__state = self.get_state(self.initial)
-
-    def __validate_machine(self) -> None:
-        # TODO: empty statemachine should default to null event
-        if len(self.__root.substates) < 2:
-            raise InvalidConfig(
-                'at least two states must exist for statechart'
-            )
-        if self.superstate.kind != 'parallel' and not getattr(
-            self, 'initial', None
-        ):
-            raise InvalidConfig('an initial state must exist for statechart')
-        log.info('validated statemachine')
+    @property
+    def initial(self) -> Optional[InitialType]:
+        return self.superstate.initial
 
     @property
     def transitions(self) -> List['Transition']:
         """Return list of current transitions."""
-        return self.superstate.transitions
+        # return self.state.transitions + self.suberstate.transitions
+        return self.state.transitions
 
     @property
     def superstate(self) -> 'State':
@@ -577,9 +566,18 @@ class StateChart(metaclass=MetaStateChart):
             if superstate != []
             else self.__root
         )
+        # if self.state.kind != 'parallel': iterate run_on_exit()
         self.state._run_on_exit(self)
         self.__state = self.get_state(state)
         self.state._run_on_entry(self)
+        if self.state.kind == 'compound' or self.state.kind == 'parallel':
+            self.__superstate = self.state
+            if self.state.kind == 'compound':
+                self.__process_initial(self.state.initial)
+            if self.state.kind == 'parallel':
+                # TODO: is this a better usecase for MP?
+                for _, x in self.state.substates.items():
+                    x._run_on_entry(self)
         self.__process_transient_state()
         log.info(f"changed state to {state}")
 
@@ -608,6 +606,13 @@ class StateChart(metaclass=MetaStateChart):
         _transition = self.__evaluate_guards(_transitions, *args, **kwargs)
         _transition.run(self, *args, **kwargs)
         log.info(f"processed transition event '{_transition.event}'")
+
+    def __process_initial(self, initial: Optional[InitialType] = None) -> None:
+        if initial:
+            _initial = initial(self) if callable(initial) else initial
+            self.__state = self.get_state(_initial)
+        elif self.superstate.kind != 'parallel' and not self.initial:
+            raise InvalidConfig('an initial state must exist for statechart')
 
     def __process_transient_state(self) -> None:
         for x in self.state.transitions:
