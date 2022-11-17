@@ -22,7 +22,9 @@ class Door(StateChart):
 
 door = Door()
 door.add_state(State(name='broken'))
-door.add_transition(Transition(event='crack', target='broken'), state='closed')
+door.add_transition(
+    Transition(event='crack', target='broken'), statepath='closed'
+)
 
 
 def test_it_responds_to_an_event():
@@ -36,7 +38,7 @@ def test_event_changes_state_when_called():
 
 def test_it_informs_all_its_states():
     assert len(door.states) == 3
-    assert door.states == ['closed', 'opened', 'broken']
+    assert door.states == ('closed', 'opened', 'broken')
 
 
 # XXX: this has been converted to __getattr__ instead

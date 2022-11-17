@@ -35,7 +35,7 @@ def test_it_has_boolean_getters_for_individual_states():
     assert guy.state != 'squashed'
 
     guy.add_transition(
-        Transition(event='land', target='squashed'), state='falling'
+        Transition(event='land', target='squashed'), statepath='falling'
     )
     guy.jump()
     guy.land()

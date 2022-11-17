@@ -18,7 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-"""Compact state machine that can be vendored."""
+"""Compact statechart that can be vendored."""
 
 import inspect
 import logging
@@ -156,28 +156,28 @@ class Action:
         params: EventActions,
         *args: Any,
         **kwargs: Any,
-    ) -> None:
-        for x in tuplize(params):
-            self._run_action(x, *args, **kwargs)
+    ) -> Tuple[Any, ...]:
+        return tuple(
+            self._run_action(x, *args, **kwargs) for x in tuplize(params)
+        )
 
     def _run_action(
         self, action: EventAction, *args: Any, **kwargs: Any
-    ) -> None:
+    ) -> Any:
         if callable(action):
-            self.__run_with_args(action, self.__machine, *args, **kwargs)
-        else:
-            self.__run_with_args(
-                getattr(self.__machine, action), *args, **kwargs
+            return self.__run_with_args(
+                action, self.__machine, *args, **kwargs
             )
+        return self.__run_with_args(
+            getattr(self.__machine, action), *args, **kwargs
+        )
 
     @staticmethod
-    def __run_with_args(action: Callable, *args: Any, **kwargs: Any) -> None:
-        # TODO: need to comform with https://peps.python.org/pep-0570/
+    def __run_with_args(action: Callable, *args: Any, **kwargs: Any) -> Any:
         signature = inspect.signature(action)
         if len(signature.parameters.keys()) != 0:
-            action(*args, **kwargs)
-        else:
-            action()
+            return action(*args, **kwargs)
+        return action()
 
 
 class Guard:
@@ -215,13 +215,13 @@ class Guard:
         params = dict(signature.parameters)
 
         if len(params.keys()) != 0:
-            _kwargs = {k: v for k, v in kwargs.items() if k in params.keys()}
-            _args = tuple(
-                x
-                for i, x in enumerate(params.keys())
-                if i < (len(params.keys()) - len(_kwargs.keys()))
-            )
-            return cond(*_args, **_kwargs)
+            # _kwargs = {k: v for k, v in kwargs.items() if k in params.keys()}
+            # _args = tuple(
+            #     x
+            #     for i, x in enumerate(params.keys())
+            #     if i < (len(params.keys()) - len(_kwargs.keys()))
+            # )
+            return cond(*args, **kwargs)
         return cond()
 
 
@@ -376,10 +376,9 @@ class State:
             if not self.initial:
                 kind = 'parallel'
             kind = 'compound'
-        elif self.transitions != []:
-            kind = 'atomic'
         else:
-            kind = 'final'
+            # XXX: can auto to final - if self.transitions != []: else 'final'
+            kind = 'atomic'
         return kind
 
     @property
@@ -398,9 +397,9 @@ class State:
         return self.__states
 
     @property
-    def transitions(self) -> List['Transition']:
+    def transitions(self) -> Tuple['Transition', ...]:
         """Return transitions of this state."""
-        return self.__transitions
+        return tuple(self.__transitions)
 
     def add_state(self, state: 'State') -> None:
         """Add substate to this state."""
@@ -411,9 +410,9 @@ class State:
         self.__transitions.append(transition)
         self.__register_transition_callback(transition)
 
-    def get_transition(self, event: str) -> List['Transition']:
+    def get_transition(self, event: str) -> Tuple['Transition', ...]:
         """Get each transition maching event."""
-        return list(
+        return tuple(
             filter(
                 lambda transition: transition.event == event, self.transitions
             )
@@ -493,22 +492,22 @@ class StateChart(metaclass=MetaStateChart):
             raise AttributeError
 
         if name.startswith('is_'):
-            return self.__state.name == name[3:]
+            if self.state.kind == 'parallel':
+                for s in self.states:
+                    if s.name == name[3:]:
+                        return True
+            return self.state.name == name[3:]
 
         # for key in list(self.states):
         #     if key == name:
         #         return self.__items[name]
 
-        for x in (
-            self.state.transitions + self.superstate.transitions
-            if self.state != self.superstate
-            else self.state.transitions
-        ):
-            if x.event == name or (x.event == '' and name == '_auto_'):
-                return x.callback().__get__(self, self.__class__)
-        # if self.state.kind == 'final':
-        #     raise InvalidTransition('final state cannot transition')
+        if self.state.kind == 'final':
+            raise InvalidTransition('final state cannot transition')
 
+        for t in self.transitions:
+            if t.event == name or (t.event == '' and name == '_auto_'):
+                return t.callback().__get__(self, self.__class__)
         raise AttributeError
 
     @property
@@ -516,10 +515,14 @@ class StateChart(metaclass=MetaStateChart):
         return self.superstate.initial
 
     @property
-    def transitions(self) -> List['Transition']:
+    def transitions(self) -> Tuple['Transition', ...]:
         """Return list of current transitions."""
-        # return self.state.transitions + self.suberstate.transitions
-        return self.state.transitions
+        # return self.state.transitions
+        return tuple(
+            self.state.transitions + self.superstate.transitions
+            if self.state != self.superstate
+            else self.state.transitions
+        )
 
     @property
     def superstate(self) -> 'State':
@@ -527,33 +530,30 @@ class StateChart(metaclass=MetaStateChart):
         return self.__superstate
 
     @property
-    def states(self) -> List['State']:
+    def states(self) -> Tuple['State', ...]:
         """Return list of states."""
-        return list(self.superstate.substates.values())
+        return tuple(self.superstate.substates.values())
 
     @property
     def state(self) -> 'State':
         """Return the current state."""
         try:
-            # XXX: handle parallel state (currently state is parent)
-            # if self.superstate.kind == 'parallel':
-            #     print(tuple(x.name for x in self.states if x != ''))
             return self.__state
         except Exception:
             log.error('state is undefined')
             raise KeyError
 
-    def get_state(self, query: str) -> 'State':
+    def get_state(self, statepath: str) -> 'State':
         """Get state from query path."""
-        paths = query.split('.')
-        current = self.state if query.startswith('.') else self.__root
-        for i, state in enumerate(paths):
+        subpaths = statepath.split('.')
+        current = self.state if statepath.startswith('.') else self.__root
+        for i, state in enumerate(subpaths):
             if current != state:
                 current = current.substates[state]
-            if i == (len(paths) - 1):
+            if i == (len(subpaths) - 1):
                 log.info(f"found state '{current.name}'")
                 return current
-        raise InvalidState(f"state could not be found: {query}")
+        raise InvalidState(f"state could not be found: {statepath}")
 
     def _change_state(self, state: str) -> None:
         """Change current state to target state."""
@@ -576,22 +576,30 @@ class StateChart(metaclass=MetaStateChart):
                 self.__process_initial(self.state.initial)
             if self.state.kind == 'parallel':
                 # TODO: is this a better usecase for MP?
-                for _, x in self.state.substates.items():
+                for x in self.state.substates.values():
                     x._run_on_entry(self)
         self.__process_transient_state()
         log.info(f"changed state to {state}")
 
-    def add_state(self, state: 'State', query: Optional[str] = None) -> None:
+    def transition(self, event: str, statepath: Optional[str] = None) -> None:
+        state = self.get_state(statepath) if statepath else self.state
+        for t in state.transitions:
+            if t.event == event:
+                return t.callback().__get__(self, self.__class__)
+
+    def add_state(
+        self, state: 'State', statepath: Optional[str] = None
+    ) -> None:
         """Add state to either superstate or target state."""
-        parent = self.get_state(query) if query else self.superstate
+        parent = self.get_state(statepath) if statepath else self.superstate
         parent.add_state(state)
         log.info(f"added state {state.name}")
 
     def add_transition(
-        self, transition: 'Transition', state: Optional[str] = None
+        self, transition: 'Transition', statepath: Optional[str] = None
     ) -> None:
         """Add transition to either superstate or target state."""
-        target = self.get_state(state) if state else self.superstate
+        target = self.get_state(statepath) if statepath else self.superstate
         target.add_transition(transition)
         log.info(f"added transition {transition.event}")
 
@@ -621,7 +629,7 @@ class StateChart(metaclass=MetaStateChart):
                 break
 
     def __evaluate_guards(
-        self, transitions: List['Transition'], *args: Any, **kwargs: Any
+        self, transitions: Tuple['Transition', ...], *args: Any, **kwargs: Any
     ) -> 'Transition':
         allowed = []
         for _transition in transitions:

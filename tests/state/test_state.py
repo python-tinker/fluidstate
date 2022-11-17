@@ -18,7 +18,7 @@ def test_it_defines_states():
 
     machine = MyMachine()
     assert len(machine.states) == 3
-    assert machine.states == ['unread', 'read', 'closed']
+    assert machine.states == ('unread', 'read', 'closed')
 
 
 def test_it_has_an_initial():
@@ -58,7 +58,7 @@ def test_it_defines_states_using_method_calls():
 
     machine = MyMachine()
     assert len(machine.states) == 3
-    assert machine.states == ['unread', 'read', 'closed']
+    assert machine.states == ('unread', 'read', 'closed')
 
     class OtherMachine(StateChart):
         create_machine(
@@ -78,7 +78,7 @@ def test_it_defines_states_using_method_calls():
 
     machine = OtherMachine()
     assert len(machine.states) == 2
-    assert machine.states == ['idle', 'working']
+    assert machine.states == ('idle', 'working')
 
 
 # FIXME: cannot use lamda initialization
