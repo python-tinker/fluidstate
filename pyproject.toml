@@ -13,51 +13,57 @@ requires-python = ">=3.6.2"
 authors = [{name = "Jesse P. Johnson", email = "jpj6652@gmail.com"}]
 maintainers = [{name = "Jesse P. Johnson", email = "jpj6652@gmail.com"}]
 classifiers = [
-  "Development Status :: 3 - Alpha",
-  "Intended Audience :: Developers",
-  "License :: OSI Approved :: MIT License",
-  "Programming Language :: Python",
-  "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.6",
-  "Programming Language :: Python :: 3.7",
-  "Programming Language :: Python :: 3.8",
-  "Programming Language :: Python :: 3.9",
-  "Programming Language :: Python :: 3.10",
-  "Topic :: Software Development :: Libraries"
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries"
 ]
 
 [project.optional-dependencies]
 build = [
-  "build",
-  "proman-versioning>=0.5.0-alpha.2"
+    "build",
+    "proman-versioning>=0.5.0-alpha.2",
+    "twine"
+]
+dev = [
+    # test
+    "pytest>=7",
+    "pytest-benchmark>=4",
+    "pytest-cov>=2.10.0",
+    "tox>=3.25.0",
+    # sca
+    "mypy>=1",
+    "pylint>=3",
+    # style
+    "black==22.3.0",
+    "isort>=5.10.1",
+    "flake8>=3.8.3",
+    # sast
+    "bandit>=1.6.2",
+    "safety>=1.9.0"
 ]
 docs = [
-  "docstr-coverage>=1.2.0",
-]
-test = [
-  "pytest>=7",
-  "tox>=3.25.0",
-]
-sca = [
-  "mypy>=0.942",
-  "bandit>=1.6.2",
-  # "pylint>=2.9.5"
-]
-style = [
-  "black==22.3.0",
-  "isort>=5.10.1",
-  "flake8>=3.8.3",
+    "docstr-coverage>=1.2.0",
+    "mkdocs>=1.2",
+    "mkdocs-material>=7.2",
+    "mkdocstrings>=0.15.2",
+    "pydocstyle[toml]>=6.1.1"
 ]
 
 [project.urls]
-repository = "https://github.com/kuwv/python-fluidstate"
+repository = "https://github.com/python-tinker/fluidstate"
 
 [tool.proman.versioning]
 enable_devreleases = false
-
-[[tool.proman.versioning.files]]
-filepath = "pyproject.toml"
-pattern = "version = \"${version}\""
 
 [[tool.proman.versioning.files]]
 filepath = "src/fluidstate/__init__.py"
@@ -69,9 +75,26 @@ pattern = "__version__ == '${version}'"
 
 [tool.pydocstyle]
 ignore = [
-  "D203",
-  "D213"
+    "D203",
+    "D213"
 ]
+
+[tool.pylint]
+fail-under = 9.0
+
+[tool.pylint."MESSAGES CONTROL"]
+disable = [
+    "R0903",
+    "W0122",
+    "W0123",
+    "W0715"
+]
+
+[tool.pylint."FORMAT"]
+max-line-length = 79
+
+[tool.pylint."MISCELLANEOUS"]
+notes = []
 
 [tool.isort]
 profile = "black"
@@ -83,12 +106,29 @@ skip-string-normalization = true
 include = '\.pyi?$'
 exclude = '''
 (
-  /(
-    | \.git
-    | \.mypy_cache
-    | \.pytest_cache
-    | build
-    | dist
-  )
+    /(
+        | \.git
+        | \.mypy_cache
+        | \.pytest_cache
+        | build
+        | dist
+    )
 )
 '''
+
+[tool.mypy]
+disallow_untyped_defs = true
+exclude = [
+    "examples",
+    "tests"
+]
+ignore_missing_imports = true
+warn_incomplete_stub = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+
+[tool.pytest.ini_options]
+addopts = "--doctest-modules"
+testpaths = [
+    "tests"
+]
