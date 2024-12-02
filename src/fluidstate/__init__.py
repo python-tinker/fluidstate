@@ -39,7 +39,7 @@ __author__ = 'Jesse P. Johnson'
 __author_email__ = 'jpj6652@gmail.com'
 __title__ = 'fluidstate'
 __description__ = 'Compact statechart that can be vendored.'
-__version__ = '1.1.0a3'
+__version__ = '1.1.0a4'
 __license__ = 'MIT'
 __copyright__ = 'Copyright 2022 Jesse Johnson.'
 __all__ = (
@@ -66,6 +66,7 @@ STATE: Optional['State'] = None
 
 
 def transition(config: Union['Transition', dict]) -> 'Transition':
+    """Consolidate."""
     if isinstance(config, Transition):
         return config
     if isinstance(config, dict):
@@ -79,23 +80,20 @@ def transition(config: Union['Transition', dict]) -> 'Transition':
 
 
 def state(config: Union['State', dict, str]) -> 'State':
+    """Consolidate."""
     if isinstance(config, State):
         return config
-    elif isinstance(config, str):
+    if isinstance(config, str):
         return State(config)
-    elif isinstance(config, dict):
+    if isinstance(config, dict):
         cls = config.get('factory', State)
         return cls(
             name=config['name'],
             initial=config.get('initial'),
             kind=config.get('kind'),
-            states=(
-                states(*config['states'], update_global=False)
-                if 'states' in config
-                else []
-            ),
+            states=(states(*config['states']) if 'states' in config else []),
             transitions=(
-                transitions(*config['transitions'], update_global=False)
+                transitions(*config['transitions'])
                 if 'transitions' in config
                 else []
             ),
@@ -105,15 +103,18 @@ def state(config: Union['State', dict, str]) -> 'State':
     raise InvalidConfig('could not find a valid state configuration')
 
 
-def transitions(*args: Any, **kwargs: Any) -> List['Transition']:
+def transitions(*args: Any) -> List['Transition']:
+    """Consolidate."""
     return list(map(transition, args))
 
 
-def states(*args: Any, **kwargs: Any) -> List['State']:
+def states(*args: Any) -> List['State']:
+    """Consolidate."""
     return list(map(state, args))
 
 
 def create_machine(config: Dict[str, Any], **kwargs: Any) -> 'State':
+    """Consolidate."""
     global STATE
     cls = kwargs.get('factory', State)
     _state = cls(
@@ -129,24 +130,13 @@ def create_machine(config: Dict[str, Any], **kwargs: Any) -> 'State':
 
 
 def tuplize(value: Any) -> Tuple[Any, ...]:
+    """Convert any type into a tuple."""
     # TODO: tuplize if generator
     return tuple(value) if type(value) in (list, tuple) else (value,)
 
 
-# class NameDescriptor:
-#     def __get__(
-#         self, obj: object, objtype: Optional[type[object]] = None
-#     ) -> str:
-#         return self.value
-#
-#     def __set__(self, obj: object, value: str) -> None:
-#         if not value.replace('_', '').isalnum():
-#             raise InvalidConfig('state name contains invalid characters')
-#         self.value = value
-
-
 class Action:
-    __slots__ = ['__machine']
+    """Encapsulate executable content."""
 
     def __init__(self, machine: 'StateChart') -> None:
         self.__machine = machine
@@ -157,6 +147,7 @@ class Action:
         *args: Any,
         **kwargs: Any,
     ) -> Tuple[Any, ...]:
+        """Run the action."""
         return tuple(
             self._run_action(x, *args, **kwargs) for x in tuplize(params)
         )
@@ -181,7 +172,7 @@ class Action:
 
 
 class Guard:
-    __slots__ = ['__machine']
+    """Control the flow of transitions to states with conditions."""
 
     def __init__(self, machine: 'StateChart') -> None:
         self.__machine = machine
@@ -189,6 +180,7 @@ class Guard:
     def evaluate(
         self, cond: GuardConditions, *args: Any, **kwargs: Any
     ) -> bool:
+        """Evaluate conditions."""
         result = True
         for x in tuplize(cond):
             result = result and self.__evaluate(x, *args, **kwargs)
@@ -201,11 +193,10 @@ class Guard:
     ) -> bool:
         if callable(cond):
             return cond(self.__machine, *args, **kwargs)
-        else:
-            guard = getattr(self.__machine, cond)
-            if callable(guard):
-                return self.__evaluate_with_args(guard, *args, **kwargs)
-            return bool(guard)
+        guard = getattr(self.__machine, cond)
+        if callable(guard):
+            return self.__evaluate_with_args(guard, *args, **kwargs)
+        return bool(guard)
 
     @staticmethod
     def __evaluate_with_args(
@@ -226,7 +217,8 @@ class Guard:
 
 
 class Transition:
-    __slots__ = ['event', 'target', 'action', 'cond']
+    """Provide transition capability for transitions."""
+
     # event = cast(str, NameDescriptor())
     # target = cast(str, NameDescriptor())
 
@@ -246,7 +238,9 @@ class Transition:
         return repr(f"Transition(event={self.event}, target={self.target})")
 
     def callback(self) -> Callable:
-        def event(machine, *args, **kwargs):
+        """Provide callback capbility."""
+
+        def event(machine: 'StateChart', *args: Any, **kwargs: Any) -> None:
             machine._process_transitions(self.event, *args, **kwargs)
 
         event.__name__ = self.event
@@ -256,6 +250,7 @@ class Transition:
     def evaluate(
         self, machine: 'StateChart', *args: Any, **kwargs: Any
     ) -> bool:
+        """Evaluate guard conditions to determine correct transition."""
         return (
             Guard(machine).evaluate(self.cond, *args, **kwargs)
             if self.cond
@@ -263,27 +258,18 @@ class Transition:
         )
 
     def run(self, machine: 'StateChart', *args: Any, **kwargs: Any) -> None:
+        """Execute actions of the transition."""
         machine._change_state(self.target)
         if self.action:
             Action(machine).run(self.action, *args, **kwargs)
-            log.info(f"executed action event for '{self.event}'")
+            log.info("executed action event for %r", self.event)
         else:
-            log.info(f"no action event for '{self.event}'")
+            log.info("no action event for %r", self.event)
 
 
 class State:
-    __slots__ = [
-        'name',
-        '__initial',
-        '__state',
-        '__states',
-        '__transitions',
-        '__on_entry',
-        '__on_exit',
-        '__kind',
-        '__dict__',
-    ]
-    # name = cast(str, NameDescriptor())
+    """Represent state."""
+
     __initial: Optional[InitialType]
     __on_entry: Optional[EventActions]
     __on_exit: Optional[EventActions]
@@ -291,8 +277,8 @@ class State:
     def __init__(
         self,
         name: str,
-        transitions: List['Transition'] = [],
-        states: List['State'] = [],
+        transitions: Optional[List['Transition']] = None,
+        states: Optional[List['State']] = None,
         **kwargs: Any,
     ) -> None:
         if not name.replace('_', '').isalnum():
@@ -301,20 +287,16 @@ class State:
         self.__kind = kwargs.get('kind')
 
         self.__state = self
-        self.__states = {x.name: x for x in states}
+        self.__states = {x.name: x for x in states or []}
         # self.__states = {x.name: x for x in args if isinstance(x, State)}
 
-        self.__transitions = transitions
+        self.__transitions = transitions or []
         # self.__transitions = [x for x in args if isinstance(x, Transition)]
         for x in self.transitions:
             self.__register_transition_callback(x)
 
         self.__initial = kwargs.get('initial')
-        self.__history = (
-            kwargs.get('history', 'shallow')
-            if self.kind == 'history'
-            else None
-        )
+
         # FIXME: pseudostates should not include triggers
         self.__on_entry = kwargs.get('on_entry')
         self.__on_exit = kwargs.get('on_exit')
@@ -327,17 +309,18 @@ class State:
     def __eq__(self, other: object) -> bool:
         if isinstance(other, State):
             return self.name == other.name
-        elif isinstance(other, str):
+        if isinstance(other, str):
             return self.name == other
         return False
 
-    def __register_transition_callback(self, transition: 'Transition') -> None:
+    def __register_transition_callback(self, t: 'Transition') -> None:
         # XXX: currently mapping to class instead of instance
         # TODO: need way to provide auto-transition
         setattr(
             self,
-            transition.event if transition.event != '' else '_auto_',
-            transition.callback().__get__(self, self.__class__),
+            t.event if t.event != '' else '_auto_',
+            # pylint: disable-next=unnecessary-dunder-call
+            t.callback().__get__(self, self.__class__),
         )
 
     def __validate_state(self) -> None:
@@ -365,7 +348,7 @@ class State:
         """Return state type."""
         if self.__kind:
             kind = self.__kind
-        elif self.substates != {} and self.transitions != []:
+        elif self.substates and self.transitions:
             for x in self.transitions:
                 if x == '':
                     kind = 'transient'
@@ -382,11 +365,6 @@ class State:
         return kind
 
     @property
-    def history(self) -> Optional[str]:
-        """Return previous substate."""
-        return self.__history
-
-    @property
     def substate(self) -> 'State':
         """Current substate of this state."""
         return self.__state
@@ -401,14 +379,14 @@ class State:
         """Return transitions of this state."""
         return tuple(self.__transitions)
 
-    def add_state(self, state: 'State') -> None:
+    def add_state(self, s: 'State') -> None:
         """Add substate to this state."""
-        self.__states[state.name] = state
+        self.__states[s.name] = s
 
-    def add_transition(self, transition: 'Transition') -> None:
+    def add_transition(self, t: 'Transition') -> None:
         """Add transition to this state."""
-        self.__transitions.append(transition)
-        self.__register_transition_callback(transition)
+        self.__transitions.append(t)
+        self.__register_transition_callback(t)
 
     def get_transition(self, event: str) -> Tuple['Transition', ...]:
         """Get each transition maching event."""
@@ -419,29 +397,35 @@ class State:
         )
 
     def _run_on_entry(self, machine: 'StateChart') -> None:
+        """Run entry actions when leaving state."""
         if self.__on_entry is not None:
             Action(machine).run(self.__on_entry)
             log.info(
-                f"executed 'on_entry' state change action for {self.name}"
+                "executed 'on_entry' state change action for %s", self.name
             )
 
     def _run_on_exit(self, machine: 'StateChart') -> None:
+        """Run exit actions when leaving state."""
         if self.__on_exit is not None:
             Action(machine).run(self.__on_exit)
-            log.info(f"executed 'on_exit' state change action for {self.name}")
+            log.info(
+                "executed 'on_exit' state change action for %s", self.name
+            )
 
 
 class MetaStateChart(type):
+    """Provide capability to populate configuration for statemachine ."""
+
     _root: 'State'
 
     def __new__(
-        cls,
+        mcs,
         name: str,
         bases: Tuple[type, ...],
         attrs: Dict[str, Any],
     ) -> 'MetaStateChart':
         global STATE
-        obj = super(MetaStateChart, cls).__new__(cls, name, bases, attrs)
+        obj = super().__new__(mcs, name, bases, attrs)
         if STATE:
             obj._root = STATE
         STATE = None
@@ -449,7 +433,7 @@ class MetaStateChart(type):
 
 
 class StateChart(metaclass=MetaStateChart):
-    __slots__ = ['__states', '__dict__']
+    """Provide state management capability."""
 
     def __init__(
         self,
@@ -507,11 +491,13 @@ class StateChart(metaclass=MetaStateChart):
 
         for t in self.transitions:
             if t.event == name or (t.event == '' and name == '_auto_'):
+                # pylint: disable-next=unnecessary-dunder-call
                 return t.callback().__get__(self, self.__class__)
         raise AttributeError
 
     @property
     def initial(self) -> Optional[InitialType]:
+        """Initial state of state machine."""
         return self.superstate.initial
 
     @property
@@ -539,38 +525,38 @@ class StateChart(metaclass=MetaStateChart):
         """Return the current state."""
         try:
             return self.__state
-        except Exception:
+        except Exception as exc:
             log.error('state is undefined')
-            raise KeyError
+            raise KeyError from exc
 
     def get_state(self, statepath: str) -> 'State':
         """Get state from query path."""
         subpaths = statepath.split('.')
         current = self.state if statepath.startswith('.') else self.__root
-        for i, state in enumerate(subpaths):
-            if current != state:
-                current = current.substates[state]
+        for i, s in enumerate(subpaths):
+            if current != s:
+                current = current.substates[s]
             if i == (len(subpaths) - 1):
-                log.info(f"found state '{current.name}'")
+                log.info('found state %r', current.name)
                 return current
         raise InvalidState(f"state could not be found: {statepath}")
 
-    def _change_state(self, state: str) -> None:
+    def _change_state(self, s: str) -> None:
         """Change current state to target state."""
-        log.info(f"changing state from {state}")
+        log.info('changing state from %s', state)
         # XXX: might not want target selection to be callable
-        state = state(self) if callable(state) else state
-        superstate = state.split('.')[:-1]
-        self.__supertstate = (
-            self.get_state('.'.join(superstate))
-            if superstate != []
-            else self.__root
-        )
-        # if self.state.kind != 'parallel': iterate run_on_exit()
+        s = s(self) if callable(s) else s
+        # superstate = state.split('.')[:-1]
+        # self.__supertstate = (
+        #     self.get_state('.'.join(superstate))
+        #     if superstate != []
+        #     else self.__root
+        # )
+        # if self.state.kind != 'parallel': iterate _run_on_exit()
         self.state._run_on_exit(self)
-        self.__state = self.get_state(state)
+        self.__state = self.get_state(s)
         self.state._run_on_entry(self)
-        if self.state.kind == 'compound' or self.state.kind == 'parallel':
+        if self.state.kind in ('compound', 'parallel'):
             self.__superstate = self.state
             if self.state.kind == 'compound':
                 self.__process_initial(self.state.initial)
@@ -579,41 +565,44 @@ class StateChart(metaclass=MetaStateChart):
                 for x in self.state.substates.values():
                     x._run_on_entry(self)
         self.__process_transient_state()
-        log.info(f"changed state to {state}")
+        log.info('changed state to %s', state)
 
-    def transition(self, event: str, statepath: Optional[str] = None) -> None:
-        state = self.get_state(statepath) if statepath else self.state
-        for t in state.transitions:
+    def transition(
+        self, event: str, statepath: Optional[str] = None
+    ) -> Optional[Any]:
+        """Transition from one state to another."""
+        s = self.get_state(statepath) if statepath else self.state
+        for t in s.transitions:
             if t.event == event:
+                # pylint: disable-next=unnecessary-dunder-call
                 return t.callback().__get__(self, self.__class__)
+        return None
 
-    def add_state(
-        self, state: 'State', statepath: Optional[str] = None
-    ) -> None:
+    def add_state(self, s: 'State', statepath: Optional[str] = None) -> None:
         """Add state to either superstate or target state."""
         parent = self.get_state(statepath) if statepath else self.superstate
-        parent.add_state(state)
-        log.info(f"added state {state.name}")
+        parent.add_state(s)
+        log.info('added state %s', s.name)
 
     def add_transition(
-        self, transition: 'Transition', statepath: Optional[str] = None
+        self, tx: 'Transition', statepath: Optional[str] = None
     ) -> None:
         """Add transition to either superstate or target state."""
         target = self.get_state(statepath) if statepath else self.superstate
-        target.add_transition(transition)
-        log.info(f"added transition {transition.event}")
+        target.add_transition(tx)
+        log.info('added transition %s', tx.event)
 
     def _process_transitions(
         self, event: str, *args: Any, **kwargs: Any
     ) -> None:
         # TODO: need to consider superstate transitions.
-        _transitions = self.state.get_transition(event)
-        # _transitions += self.superstate.get_transition(event)
-        if _transitions == []:
+        txs = self.state.get_transition(event)
+        # txs += self.superstate.get_transition(event)
+        if txs == []:
             raise InvalidTransition('no transitions match event')
-        _transition = self.__evaluate_guards(_transitions, *args, **kwargs)
-        _transition.run(self, *args, **kwargs)
-        log.info(f"processed transition event '{_transition.event}'")
+        tx = self.__evaluate_guards(txs, *args, **kwargs)
+        tx.run(self, *args, **kwargs)
+        log.info('processed transition event %s', tx.event)
 
     def __process_initial(self, initial: Optional[InitialType] = None) -> None:
         if initial:
@@ -629,43 +618,43 @@ class StateChart(metaclass=MetaStateChart):
                 break
 
     def __evaluate_guards(
-        self, transitions: Tuple['Transition', ...], *args: Any, **kwargs: Any
+        self, txs: Tuple['Transition', ...], *args: Any, **kwargs: Any
     ) -> 'Transition':
         allowed = []
-        for _transition in transitions:
-            if _transition.evaluate(self, *args, **kwargs):
-                allowed.append(_transition)
+        for tx in txs:
+            if tx.evaluate(self, *args, **kwargs):
+                allowed.append(tx)
         if len(allowed) == 0:
             raise GuardNotSatisfied(
                 'Guard is not satisfied for this transition'
             )
-        elif len(allowed) > 1:
+        if len(allowed) > 1:
             raise ForkedTransition(
                 'More than one transition was allowed for this event'
             )
-        log.info(f"processed guard fo '{allowed[0].event}'")
+        log.info('processed guard for %s', allowed[0].event)
         return allowed[0]
 
 
 class FluidstateException(Exception):
-    pass
+    """Provide base fluidstate exception."""
 
 
 class InvalidConfig(FluidstateException):
-    pass
+    """Handle invalid state configuration."""
 
 
 class InvalidTransition(FluidstateException):
-    pass
+    """Handle invalid transitions."""
 
 
 class InvalidState(FluidstateException):
-    pass
+    """Handle invalid state transition."""
 
 
 class GuardNotSatisfied(FluidstateException):
-    pass
+    """Handle failed guard check."""
 
 
 class ForkedTransition(FluidstateException):
-    pass
+    """Handle multiple possible transiion paths."""
