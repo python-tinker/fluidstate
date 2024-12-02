@@ -71,72 +71,6 @@ def tuplize(value: Any) -> Tuple[Any, ...]:
     return tuple(value) if type(value) in (list, tuple) else (value,)
 
 
-def transition(settings: Union['Transition', dict]) -> 'Transition':
-    """Consolidate."""
-    if isinstance(settings, Transition):
-        return settings
-    if isinstance(settings, dict):
-        return Transition(
-            event=settings['event'],
-            target=settings['target'],
-            action=(
-                tuple(map(Action.create, tuplize(settings['action'])))
-                if 'action' in settings
-                else []
-            ),
-            cond=(
-                tuple(map(Guard.create, tuplize(settings['cond'])))
-                if 'cond' in settings
-                else []
-            ),
-        )
-    raise InvalidConfig('could not find a valid transition configuration')
-
-
-def state(settings: Union['State', dict, str]) -> 'State':
-    """Consolidate."""
-    if isinstance(settings, State):
-        return settings
-    if isinstance(settings, str):
-        return State(settings)
-    if isinstance(settings, dict):
-        cls = settings.get('factory', State)
-        return cls(
-            name=settings['name'],
-            initial=settings.get('initial'),
-            kind=settings.get('kind'),
-            states=(
-                states(*settings['states']) if 'states' in settings else []
-            ),
-            transitions=(
-                transitions(*settings['transitions'])
-                if 'transitions' in settings
-                else []
-            ),
-            on_entry=(
-                tuple(map(Action.create, tuplize(settings['on_entry'])))
-                if 'on_entry' in settings
-                else None
-            ),
-            on_exit=(
-                tuple(map(Action.create, tuplize(settings['on_exit'])))
-                if 'on_exit' in settings
-                else []
-            ),
-        )
-    raise InvalidConfig('could not find a valid state configuration')
-
-
-def transitions(*args: Any) -> List['Transition']:
-    """Consolidate."""
-    return list(map(transition, args))
-
-
-def states(*args: Any) -> List['State']:
-    """Consolidate."""
-    return list(map(state, args))
-
-
 def create_machine(settings: Dict[str, Any], **kwargs: Any) -> 'State':
     """Consolidate."""
     global STATE
@@ -145,8 +79,16 @@ def create_machine(settings: Dict[str, Any], **kwargs: Any) -> 'State':
         name=settings.get('name', 'root'),
         initial=settings.get('initial'),
         kind=settings.get('kind'),
-        states=states(*settings.get('states', [])),
-        transitions=transitions(*settings.get('transitions', [])),
+        states=(
+            list(map(State.create, settings['states']))
+            if 'states' in settings
+            else []
+        ),
+        transitions=(
+            list(map(Transition.create, settings['transitions']))
+            if 'transitions' in settings
+            else []
+        ),
         **kwargs,
     )
     STATE = _state
@@ -271,6 +213,28 @@ class Transition:
     def __repr__(self) -> str:
         return repr(f"Transition(event={self.event}, target={self.target})")
 
+    @classmethod
+    def create(cls, settings: Union['Transition', dict]) -> 'Transition':
+        """Consolidate."""
+        if isinstance(settings, cls):
+            return settings
+        if isinstance(settings, dict):
+            return cls(
+                event=settings['event'],
+                target=settings['target'],
+                action=(
+                    tuple(map(Action.create, tuplize(settings['action'])))
+                    if 'action' in settings
+                    else []
+                ),
+                cond=(
+                    tuple(map(Guard.create, tuplize(settings['cond'])))
+                    if 'cond' in settings
+                    else []
+                ),
+            )
+        raise InvalidConfig('could not find a valid transition configuration')
+
     def callback(self) -> Callable:
         """Provide callback capbility."""
 
@@ -374,6 +338,39 @@ class State:
         if self.kind == 'final' and self.__on_exit:
             log.warning('final state will never run "on_exit" action')
         log.info('evaluated state')
+
+    @classmethod
+    def create(cls, settings: Union['State', dict, str]) -> 'State':
+        """Consolidate."""
+        if isinstance(settings, cls):
+            return settings
+        if isinstance(settings, str):
+            return cls(settings)
+        if isinstance(settings, dict):
+            return settings.get('factory', cls)(
+                name=settings['name'],
+                initial=settings.get('initial'),
+                kind=settings.get('kind'),
+                states=(
+                    states(*settings['states']) if 'states' in settings else []
+                ),
+                transitions=(
+                    list(map(Transition.create, settings['transitions']))
+                    if 'transitions' in settings
+                    else []
+                ),
+                on_entry=(
+                    tuple(map(Action.create, tuplize(settings['on_entry'])))
+                    if 'on_entry' in settings
+                    else None
+                ),
+                on_exit=(
+                    tuple(map(Action.create, tuplize(settings['on_exit'])))
+                    if 'on_exit' in settings
+                    else []
+                ),
+            )
+        raise InvalidConfig('could not find a valid state configuration')
 
     @property
     def initial(self) -> Optional[InitialType]:
@@ -580,7 +577,7 @@ class StateChart(metaclass=MetaStateChart):
 
     def _change_state(self, s: str) -> None:
         """Change current state to target state."""
-        log.info('changing state from %s', state)
+        log.info('changing state from %s', s)
         # XXX: might not want target selection to be callable
         s = s(self) if callable(s) else s
         # superstate = state.split('.')[:-1]
@@ -602,7 +599,7 @@ class StateChart(metaclass=MetaStateChart):
                 for x in self.state.substates.values():
                     x._run_on_entry(self)
         self.__process_transient_state()
-        log.info('changed state to %s', state)
+        log.info('changed state to %s', s)
 
     def transition(
         self, event: str, statepath: Optional[str] = None
