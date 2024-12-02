@@ -53,12 +53,12 @@ def test_it_selects_the_transition_having_a_passing_guard():
     request = LoanRequest()
     request.analyze()
     request.forward_analysis_result()
-    request.state == 'accepted'
+    assert request.state == 'accepted'
 
     request = LoanRequest()
     request.analyze(accepted=False)
     request.forward_analysis_result()
-    request.state == 'refused'
+    assert request.state == 'refused'
 
 
 def test_it_raises_error_if_more_than_one_guard_passes():

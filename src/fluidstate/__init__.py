@@ -56,49 +56,73 @@ log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
 EventAction = Union[Callable, str]
-EventActions = Union[EventAction, Iterable[EventAction]]
+EventActions = Iterable[EventAction]
 GuardCondition = Union[Callable, str]
-GuardConditions = Union[GuardCondition, Iterable[GuardCondition]]
+GuardConditions = Iterable[GuardCondition]
 InitialType = Union[Callable, str]
 
 STATE: Optional['State'] = None
 # enable_signature_truncation = False
 
 
-def transition(config: Union['Transition', dict]) -> 'Transition':
+def tuplize(value: Any) -> Tuple[Any, ...]:
+    """Convert any type into a tuple."""
+    # TODO: tuplize if generator
+    return tuple(value) if type(value) in (list, tuple) else (value,)
+
+
+def transition(settings: Union['Transition', dict]) -> 'Transition':
     """Consolidate."""
-    if isinstance(config, Transition):
-        return config
-    if isinstance(config, dict):
+    if isinstance(settings, Transition):
+        return settings
+    if isinstance(settings, dict):
         return Transition(
-            event=config['event'],
-            target=config['target'],
-            action=config.get('action'),
-            cond=config.get('cond'),
+            event=settings['event'],
+            target=settings['target'],
+            action=(
+                tuple(map(Action.create, tuplize(settings['action'])))
+                if 'action' in settings
+                else []
+            ),
+            cond=(
+                tuple(map(Guard.create, tuplize(settings['cond'])))
+                if 'cond' in settings
+                else []
+            ),
         )
     raise InvalidConfig('could not find a valid transition configuration')
 
 
-def state(config: Union['State', dict, str]) -> 'State':
+def state(settings: Union['State', dict, str]) -> 'State':
     """Consolidate."""
-    if isinstance(config, State):
-        return config
-    if isinstance(config, str):
-        return State(config)
-    if isinstance(config, dict):
-        cls = config.get('factory', State)
+    if isinstance(settings, State):
+        return settings
+    if isinstance(settings, str):
+        return State(settings)
+    if isinstance(settings, dict):
+        cls = settings.get('factory', State)
         return cls(
-            name=config['name'],
-            initial=config.get('initial'),
-            kind=config.get('kind'),
-            states=(states(*config['states']) if 'states' in config else []),
+            name=settings['name'],
+            initial=settings.get('initial'),
+            kind=settings.get('kind'),
+            states=(
+                states(*settings['states']) if 'states' in settings else []
+            ),
             transitions=(
-                transitions(*config['transitions'])
-                if 'transitions' in config
+                transitions(*settings['transitions'])
+                if 'transitions' in settings
                 else []
             ),
-            on_entry=config.get('on_entry'),
-            on_exit=config.get('on_exit'),
+            on_entry=(
+                tuple(map(Action.create, tuplize(settings['on_entry'])))
+                if 'on_entry' in settings
+                else None
+            ),
+            on_exit=(
+                tuple(map(Action.create, tuplize(settings['on_exit'])))
+                if 'on_exit' in settings
+                else []
+            ),
         )
     raise InvalidConfig('could not find a valid state configuration')
 
@@ -113,96 +137,106 @@ def states(*args: Any) -> List['State']:
     return list(map(state, args))
 
 
-def create_machine(config: Dict[str, Any], **kwargs: Any) -> 'State':
+def create_machine(settings: Dict[str, Any], **kwargs: Any) -> 'State':
     """Consolidate."""
     global STATE
     cls = kwargs.get('factory', State)
     _state = cls(
-        name=config.get('name', 'root'),
-        initial=config.get('initial'),
-        kind=config.get('kind'),
-        states=states(*config.get('states', [])),
-        transitions=transitions(*config.get('transitions', [])),
+        name=settings.get('name', 'root'),
+        initial=settings.get('initial'),
+        kind=settings.get('kind'),
+        states=states(*settings.get('states', [])),
+        transitions=transitions(*settings.get('transitions', [])),
         **kwargs,
     )
     STATE = _state
     return _state
 
 
-def tuplize(value: Any) -> Tuple[Any, ...]:
-    """Convert any type into a tuple."""
-    # TODO: tuplize if generator
-    return tuple(value) if type(value) in (list, tuple) else (value,)
-
-
 class Action:
     """Encapsulate executable content."""
 
-    def __init__(self, machine: 'StateChart') -> None:
-        self.__machine = machine
+    def __init__(self, content: EventAction) -> None:
+        self.content = content
+
+    @classmethod
+    def create(
+        cls, settings: Union['Action', Callable, Dict[str, Any]]
+    ) -> 'Action':
+        """Create expression from configuration."""
+        print(settings)
+        if isinstance(settings, cls):
+            return settings
+        if callable(settings) or isinstance(settings, str):
+            return cls(settings)
+        if isinstance(settings, dict):
+            return cls(**settings)
+        raise InvalidConfig('could not find a valid configuration for action')
 
     def run(
         self,
-        params: EventActions,
+        machine: 'StateChart',
         *args: Any,
         **kwargs: Any,
-    ) -> Tuple[Any, ...]:
+    ) -> Any:
         """Run the action."""
-        return tuple(
-            self._run_action(x, *args, **kwargs) for x in tuplize(params)
-        )
+        return self._run_action(machine, *args, **kwargs)
 
     def _run_action(
-        self, action: EventAction, *args: Any, **kwargs: Any
+        self, machine: 'StateChart', *args: Any, **kwargs: Any
     ) -> Any:
-        if callable(action):
-            return self.__run_with_args(
-                action, self.__machine, *args, **kwargs
-            )
+        if callable(self.content):
+            return self.__run_with_args(self.content, machine, *args, **kwargs)
         return self.__run_with_args(
-            getattr(self.__machine, action), *args, **kwargs
+            getattr(machine, self.content), *args, **kwargs
         )
 
     @staticmethod
-    def __run_with_args(action: Callable, *args: Any, **kwargs: Any) -> Any:
-        signature = inspect.signature(action)
+    def __run_with_args(content: Callable, *args: Any, **kwargs: Any) -> Any:
+        signature = inspect.signature(content)
         if len(signature.parameters.keys()) != 0:
-            return action(*args, **kwargs)
-        return action()
+            return content(*args, **kwargs)
+        return content()
 
 
 class Guard:
     """Control the flow of transitions to states with conditions."""
 
-    def __init__(self, machine: 'StateChart') -> None:
-        self.__machine = machine
+    def __init__(self, condition: GuardCondition) -> None:
+        self.condition = condition
+
+    @classmethod
+    def create(
+        cls, settings: Union['Guard', Callable, Dict[str, Any]]
+    ) -> 'Guard':
+        """Create expression from configuration."""
+        if isinstance(settings, cls):
+            return settings
+        if callable(settings) or isinstance(settings, str):
+            return cls(settings)
+        if isinstance(settings, dict):
+            return cls(**settings)
+        raise InvalidConfig('could not find a valid configuration for guard')
 
     def evaluate(
-        self, cond: GuardConditions, *args: Any, **kwargs: Any
+        self, machine: 'StateChart', *args: Any, **kwargs: Any
     ) -> bool:
         """Evaluate conditions."""
-        result = True
-        for x in tuplize(cond):
-            result = result and self.__evaluate(x, *args, **kwargs)
-            if result is False:
-                break
-        return result
-
-    def __evaluate(
-        self, cond: GuardCondition, *args: Any, **kwargs: Any
-    ) -> bool:
-        if callable(cond):
-            return cond(self.__machine, *args, **kwargs)
-        guard = getattr(self.__machine, cond)
-        if callable(guard):
-            return self.__evaluate_with_args(guard, *args, **kwargs)
-        return bool(guard)
+        if callable(self.condition):
+            return self.condition(machine, *args, **kwargs)
+        if isinstance(self.condition, str):
+            cond = getattr(machine, self.condition)
+            if callable(cond):
+                return self.__evaluate_with_args(cond, *args, **kwargs)
+            return bool(cond)
+        print('---------------', self.condition, type(self.condition))
+        return False
 
     @staticmethod
     def __evaluate_with_args(
-        cond: Callable, *args: Any, **kwargs: Any
+        condition: Callable, *args: Any, **kwargs: Any
     ) -> bool:
-        signature = inspect.signature(cond)
+        signature = inspect.signature(condition)
         params = dict(signature.parameters)
 
         if len(params.keys()) != 0:
@@ -212,8 +246,8 @@ class Guard:
             #     for i, x in enumerate(params.keys())
             #     if i < (len(params.keys()) - len(_kwargs.keys()))
             # )
-            return cond(*args, **kwargs)
-        return cond()
+            return condition(*args, **kwargs)
+        return condition()
 
 
 class Transition:
@@ -226,8 +260,8 @@ class Transition:
         self,
         event: str,
         target: str,
-        action: Optional[EventActions] = None,
-        cond: Optional[GuardConditions] = None,
+        action: Optional[Iterable[Action]] = None,
+        cond: Optional[Iterable[Guard]] = None,
     ) -> None:
         self.event = event
         self.target = target
@@ -251,17 +285,20 @@ class Transition:
         self, machine: 'StateChart', *args: Any, **kwargs: Any
     ) -> bool:
         """Evaluate guard conditions to determine correct transition."""
-        return (
-            Guard(machine).evaluate(self.cond, *args, **kwargs)
-            if self.cond
-            else True
-        )
+        result = True
+        if self.cond:
+            for cond in self.cond:
+                result = cond.evaluate(machine, *args, **kwargs)
+                if not result:
+                    break
+        return result
 
     def run(self, machine: 'StateChart', *args: Any, **kwargs: Any) -> None:
         """Execute actions of the transition."""
         machine._change_state(self.target)
         if self.action:
-            Action(machine).run(self.action, *args, **kwargs)
+            for action in self.action:
+                action.run(machine, *args, **kwargs)
             log.info("executed action event for %r", self.event)
         else:
             log.info("no action event for %r", self.event)
@@ -271,8 +308,8 @@ class State:
     """Represent state."""
 
     __initial: Optional[InitialType]
-    __on_entry: Optional[EventActions]
-    __on_exit: Optional[EventActions]
+    __on_entry: Optional[Iterable[Action]]
+    __on_exit: Optional[Iterable[Action]]
 
     def __init__(
         self,
@@ -397,20 +434,20 @@ class State:
         )
 
     def _run_on_entry(self, machine: 'StateChart') -> None:
-        """Run entry actions when leaving state."""
         if self.__on_entry is not None:
-            Action(machine).run(self.__on_entry)
-            log.info(
-                "executed 'on_entry' state change action for %s", self.name
-            )
+            for action in self.__on_entry:
+                action.run(machine)
+                log.info(
+                    "executed 'on_entry' state change action for %s", self.name
+                )
 
     def _run_on_exit(self, machine: 'StateChart') -> None:
-        """Run exit actions when leaving state."""
         if self.__on_exit is not None:
-            Action(machine).run(self.__on_exit)
-            log.info(
-                "executed 'on_exit' state change action for %s", self.name
-            )
+            for action in self.__on_exit:
+                action.run(machine)
+                log.info(
+                    "executed 'on_exit' state change action for %s", self.name
+                )
 
 
 class MetaStateChart(type):
