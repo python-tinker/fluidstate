@@ -19,27 +19,23 @@ class Door(StateChart):
 
 
 door = Door()
-door.add_state(State(name='broken'))
-door.add_transition(
-    Transition(event='crack', target='broken'), statepath='closed'
-)
 
 
-def test_it_responds_to_an_event():
+def test_it_responds_to_an_event() -> None:
     assert hasattr(door.state, 'crack')
 
 
-def test_event_changes_state_when_called():
+def test_event_changes_state_when_called() -> None:
     door.crack()
     assert door.state == 'broken'
 
 
-def test_it_informs_all_its_states():
+def test_it_informs_all_its_states() -> None:
     assert len(door.states) == 3
     assert door.states == ('closed', 'opened', 'broken')
 
 
 # XXX: this has been converted to __getattr__ instead
-# def test_individuation_does_not_affect_other_instances():
+# def test_individuation_does_not_affect_other_instances() -> None:
 #     another_door = Door()
 #     assert not hasattr(another_door.state, 'crack')

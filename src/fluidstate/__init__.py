@@ -242,19 +242,14 @@ class State:
             raise InvalidConfig('state name contains invalid characters')
         self.name = name
         self.__kind = kwargs.get('kind')
-
+        self.__initial = kwargs.get('initial')
         self.__states = {x.name: x for x in states or []}
-
         self.__transitions = transitions or []
         for x in self.transitions:
             self.__register_transition_callback(x)
-
-        self.__initial = kwargs.get('initial')
-
         # FIXME: pseudostates should not include triggers
         self.__on_entry = kwargs.get('on_entry')
         self.__on_exit = kwargs.get('on_exit')
-
         self.__validate_state()
 
     def __repr__(self) -> str:
@@ -284,10 +279,6 @@ class State:
                 raise InvalidConfig('There must be at least two states')
             if not self.initial:
                 raise InvalidConfig('There must exist an initial state')
-        if self.initial and self.kind == 'parallel':
-            raise InvalidConfig(
-                'parallel state should not have an initial state'
-            )
         if self.kind == 'final' and self.__on_exit:
             log.warning('final state will never run "on_exit" action')
         log.info('evaluated state')
@@ -337,19 +328,11 @@ class State:
         """Return state type."""
         if self.__kind:
             kind = self.__kind
-        elif self.substates and self.transitions:
-            for x in self.transitions:
-                if x == '':
-                    kind = 'transient'
-                    break
-            else:
-                kind = 'compound'
-        elif self.substates != {}:
-            if not self.initial:
-                kind = 'parallel'
+        elif self.substates:
             kind = 'compound'
         else:
-            # XXX: can auto to final - if self.transitions != []: else 'final'
+            # FIXME: error when enterin atomic state
+            # kind = 'atomic' if self.transitions else 'final'
             kind = 'atomic'
         return kind
 
@@ -362,15 +345,6 @@ class State:
     def transitions(self) -> Tuple['Transition', ...]:
         """Return transitions of this state."""
         return tuple(self.__transitions)
-
-    def add_state(self, s: 'State') -> None:
-        """Add substate to this state."""
-        self.__states[s.name] = s
-
-    def add_transition(self, t: 'Transition') -> None:
-        """Add transition to this state."""
-        self.__transitions.append(t)
-        self.__register_transition_callback(t)
 
     def get_transition(self, event: str) -> Tuple['Transition', ...]:
         """Get each transition maching event."""
@@ -471,24 +445,16 @@ class StateChart(metaclass=MetaStateChart):
             raise AttributeError
 
         if name.startswith('is_'):
-            if self.state.kind == 'parallel':
-                for s in self.states:
-                    if s.name == name[3:]:
-                        return True
             return self.state.name == name[3:]
 
-        # for key in list(self.states):
-        #     if key == name:
-        #         return self.__items[name]
-
-        if self.state.kind == 'final':
-            raise InvalidTransition('final state cannot transition')
+        # if self.state.kind == 'final':
+        #     raise InvalidTransition('final state cannot transition')
 
         for t in self.transitions:
             if t.event == name or (t.event == '' and name == '_auto_'):
                 # pylint: disable-next=unnecessary-dunder-call
                 return t.callback().__get__(self, self.__class__)
-        raise AttributeError
+        raise AttributeError(f"unable to find {name!r} attribute")
 
     @property
     def initial(self) -> Optional['Content']:
@@ -498,11 +464,10 @@ class StateChart(metaclass=MetaStateChart):
     @property
     def transitions(self) -> Tuple['Transition', ...]:
         """Return list of current transitions."""
-        # return self.state.transitions
-        return tuple(
-            self.state.transitions + self.superstate.transitions
-            if self.state != self.superstate
-            else self.state.transitions
+        return (
+            tuple(self.state.transitions)
+            if hasattr(self.state, 'transitions')
+            else ()
         )
 
     @property
@@ -547,18 +512,13 @@ class StateChart(metaclass=MetaStateChart):
         #     if superstate != []
         #     else self.__root
         # )
-        # if self.state.kind != 'parallel': iterate _run_on_exit()
         self.state._run_on_exit(self)
         self.__state = self.get_state(s)
         self.state._run_on_entry(self)
-        if self.state.kind in ('compound', 'parallel'):
+        if self.state.kind == 'compound':
             self.__superstate = self.state
             if self.state.kind == 'compound':
                 self.__process_initial(self.state.initial)
-            if self.state.kind == 'parallel':
-                # TODO: is this a better usecase for MP?
-                for x in self.state.substates.values():
-                    x._run_on_entry(self)
         self.__process_transient_state()
         log.info('changed state to %s', s)
 
@@ -572,20 +532,6 @@ class StateChart(metaclass=MetaStateChart):
                 # pylint: disable-next=unnecessary-dunder-call
                 return t.callback().__get__(self, self.__class__)
         return None
-
-    def add_state(self, s: 'State', statepath: Optional[str] = None) -> None:
-        """Add state to either superstate or target state."""
-        parent = self.get_state(statepath) if statepath else self.superstate
-        parent.add_state(s)
-        log.info('added state %s', s.name)
-
-    def add_transition(
-        self, tx: 'Transition', statepath: Optional[str] = None
-    ) -> None:
-        """Add transition to either superstate or target state."""
-        target = self.get_state(statepath) if statepath else self.superstate
-        target.add_transition(tx)
-        log.info('added transition %s', tx.event)
 
     def _process_transitions(
         self, event: str, *args: Any, **kwargs: Any
@@ -603,7 +549,7 @@ class StateChart(metaclass=MetaStateChart):
         if initial:
             _initial = initial(self) if callable(initial) else initial
             self.__state = self.get_state(_initial)
-        elif self.superstate.kind != 'parallel' and not self.initial:
+        else:
             raise InvalidConfig('an initial state must exist for statechart')
 
     def __process_transient_state(self) -> None:
