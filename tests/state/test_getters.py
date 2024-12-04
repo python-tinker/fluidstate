@@ -1,19 +1,17 @@
-from fluidstate import StateChart, State, Transition, create_machine
+from fluidstate import StateChart, State, Transition
 
 
 class JumperGuy(StateChart):
-    create_machine(
-        {
-            'initial': 'looking',
-            'states': [
-                State(
-                    'looking',
-                    transitions=[Transition(event='jump', target='falling')],
-                ),
-                State('falling'),
-            ],
-        }
-    )
+    __statechart__ = {
+        'initial': 'looking',
+        'states': [
+            State(
+                'looking',
+                transitions=[Transition(event='jump', target='falling')],
+            ),
+            State('falling'),
+        ],
+    }
 
 
 def test_it_has_boolean_getters_for_the_states():

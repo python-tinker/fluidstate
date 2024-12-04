@@ -42,15 +42,7 @@ __description__ = 'Compact statechart that can be vendored.'
 __version__ = '1.1.0a4'
 __license__ = 'MIT'
 __copyright__ = 'Copyright 2022 Jesse Johnson.'
-__all__ = (
-    'StateChart',
-    'State',
-    'Transition',
-    'states',
-    'state',
-    'transitions',
-    'transition',
-)
+__all__ = ('StateChart', 'State', 'Transition')
 
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
@@ -61,7 +53,6 @@ GuardCondition = Union[Callable, str]
 GuardConditions = Iterable[GuardCondition]
 InitialType = Union[Callable, str]
 
-STATE: Optional['State'] = None
 # enable_signature_truncation = False
 
 
@@ -69,30 +60,6 @@ def tuplize(value: Any) -> Tuple[Any, ...]:
     """Convert any type into a tuple."""
     # TODO: tuplize if generator
     return tuple(value) if type(value) in (list, tuple) else (value,)
-
-
-def create_machine(settings: Dict[str, Any], **kwargs: Any) -> 'State':
-    """Consolidate."""
-    global STATE
-    cls = kwargs.get('factory', State)
-    _state = cls(
-        name=settings.get('name', 'root'),
-        initial=settings.get('initial'),
-        kind=settings.get('kind'),
-        states=(
-            list(map(State.create, settings['states']))
-            if 'states' in settings
-            else []
-        ),
-        transitions=(
-            list(map(Transition.create, settings['transitions']))
-            if 'transitions' in settings
-            else []
-        ),
-        **kwargs,
-    )
-    STATE = _state
-    return _state
 
 
 class Action:
@@ -458,11 +425,25 @@ class MetaStateChart(type):
         bases: Tuple[type, ...],
         attrs: Dict[str, Any],
     ) -> 'MetaStateChart':
-        global STATE
         obj = super().__new__(mcs, name, bases, attrs)
-        if STATE:
-            obj._root = STATE
-        STATE = None
+        if '__statechart__' in attrs:
+            settings = attrs.pop('__statechart__')
+            obj._root = settings.pop('factory', State)(
+                name=settings.pop('name', 'root'),
+                initial=settings.pop('initial', None),
+                kind=settings.pop('kind', None),
+                states=(
+                    list(map(State.create, settings.pop('states')))
+                    if 'states' in settings
+                    else None
+                ),
+                transitions=(
+                    list(map(Transition.create, settings.pop('transitions')))
+                    if 'transitions' in settings
+                    else None
+                ),
+                # **settings,
+            )
         return obj
 
 

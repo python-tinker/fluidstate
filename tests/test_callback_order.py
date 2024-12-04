@@ -1,29 +1,27 @@
 import pytest
 
-from fluidstate import StateChart, create_machine
+from fluidstate import StateChart
 
 
 class CrazyGuy(StateChart):
-    create_machine(
-        {
-            'initial': 'looking',
-            'states': [
-                {
-                    'name': 'looking',
-                    'transitions': [
-                        {
-                            'event': 'jump',
-                            'target': 'falling',
-                            'action': 'become_at_risk',
-                            'cond': 'always_can_jump',
-                        },
-                    ],
-                    'on_exit': 'no_lookin_anymore',
-                },
-                {'name': 'falling', 'on_entry': 'will_fall_right_now'},
-            ],
-        }
-    )
+    __statechart__ = {
+        'initial': 'looking',
+        'states': [
+            {
+                'name': 'looking',
+                'transitions': [
+                    {
+                        'event': 'jump',
+                        'target': 'falling',
+                        'action': 'become_at_risk',
+                        'cond': 'always_can_jump',
+                    },
+                ],
+                'on_exit': 'no_lookin_anymore',
+            },
+            {'name': 'falling', 'on_entry': 'will_fall_right_now'},
+        ],
+    }
 
     def __init__(self):
         super().__init__()
