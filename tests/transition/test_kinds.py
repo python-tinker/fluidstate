@@ -1,31 +1,29 @@
 # import pytest
 
-from fluidstate import StateChart, create_machine
+from fluidstate import StateChart
 
 
 class Machine(StateChart):
-    create_machine(
-        {
-            'name': 'engine',
-            'initial': 'engine',
-            'states': [
-                {
-                    'name': 'started',
-                    'transitions': [
-                        # {'event': 'restart', 'target': 'started'},
-                        {'event': 'stop', 'target': 'stopped'},
-                    ],
-                },
-                {'name': 'stopped'},
-            ],
-            'transitions': [
-                {
-                    'event': '',
-                    'target': 'started',
-                },
-            ],
-        }
-    )
+    __statechart__ = {
+        'name': 'engine',
+        'initial': 'engine',
+        'states': [
+            {
+                'name': 'started',
+                'transitions': [
+                    # {'event': 'restart', 'target': 'started'},
+                    {'event': 'stop', 'target': 'stopped'},
+                ],
+            },
+            {'name': 'stopped'},
+        ],
+        'transitions': [
+            {
+                'event': '',
+                'target': 'started',
+            },
+        ],
+    }
 
 
 machine = Machine()

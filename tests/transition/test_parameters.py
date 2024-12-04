@@ -1,34 +1,32 @@
-from fluidstate import StateChart, create_machine
+from fluidstate import StateChart
 
 
 class Door(StateChart):
-    create_machine(
-        {
-            'initial': 'closed',
-            'states': [
-                {
-                    'name': 'closed',
-                    'transitions': [
-                        {
-                            'event': 'open',
-                            'target': 'open',
-                            'action': 'open_action',
-                        }
-                    ],
-                },
-                {
-                    'name': 'open',
-                    'transitions': [
-                        {
-                            'event': 'close',
-                            'target': 'closed',
-                            'action': 'close_action',
-                        }
-                    ],
-                },
-            ],
-        }
-    )
+    __statechart__ = {
+        'initial': 'closed',
+        'states': [
+            {
+                'name': 'closed',
+                'transitions': [
+                    {
+                        'event': 'open',
+                        'target': 'open',
+                        'action': 'open_action',
+                    }
+                ],
+            },
+            {
+                'name': 'open',
+                'transitions': [
+                    {
+                        'event': 'close',
+                        'target': 'closed',
+                        'action': 'close_action',
+                    }
+                ],
+            },
+        ],
+    }
 
     def open_action(self, when, where):
         self.when = when

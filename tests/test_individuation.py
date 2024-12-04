@@ -2,22 +2,20 @@
 
 # import pytest
 
-from fluidstate import StateChart, State, Transition, create_machine
+from fluidstate import StateChart, State, Transition
 
 
 class Door(StateChart):
-    create_machine(
-        {
-            'initial': 'closed',
-            'states': [
-                {
-                    'name': 'closed',
-                    'transitions': [{'event': 'open', 'target': 'opened'}],
-                },
-                {'name': 'opened'},
-            ],
-        }
-    )
+    __statechart__ = {
+        'initial': 'closed',
+        'states': [
+            {
+                'name': 'closed',
+                'transitions': [{'event': 'open', 'target': 'opened'}],
+            },
+            {'name': 'opened'},
+        ],
+    }
 
 
 door = Door()

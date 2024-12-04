@@ -1,6 +1,6 @@
 import pytest
 
-from fluidstate import GuardNotSatisfied, StateChart, create_machine
+from fluidstate import GuardNotSatisfied, StateChart
 
 footsteps = []
 
@@ -18,32 +18,29 @@ def pre_falling_function():
 
 
 class JumperGuy(StateChart):
-    create_machine(
-        {
-            'initial': 'looking',
-            'states': [
-                {
-                    'name': 'looking',
-                    'transitions': [
-                        {
-                            'event': 'jump',
-                            'target': 'falling',
-                            'action': (
-                                lambda jumper: jumper.append('action jump')
-                            ),
-                            'cond': (
-                                lambda jumper: jumper.append('guard jump')
-                                is None
-                            ),
-                        }
-                    ],
-                    'on_entry': lambda jumper: jumper.append('pre looking'),
-                    'on_exit': foo.bar,
-                },
-                {'name': 'falling', 'on_entry': pre_falling_function},
-            ],
-        }
-    )
+    __statechart__ = {
+        'initial': 'looking',
+        'states': [
+            {
+                'name': 'looking',
+                'transitions': [
+                    {
+                        'event': 'jump',
+                        'target': 'falling',
+                        'action': (
+                            lambda jumper: jumper.append('action jump')
+                        ),
+                        'cond': (
+                            lambda jumper: jumper.append('guard jump') is None
+                        ),
+                    }
+                ],
+                'on_entry': lambda jumper: jumper.append('pre looking'),
+                'on_exit': foo.bar,
+            },
+            {'name': 'falling', 'on_entry': pre_falling_function},
+        ],
+    }
 
     def __init__(self):
         super().__init__()
@@ -70,24 +67,22 @@ def test_every_callback_is_callable():
 
 def test_deny_state_change_if_guard_callable_returns_false():
     class Door(StateChart):
-        create_machine(
-            {
-                'initial': 'closed',
-                'states': [
-                    {'name': 'open'},
-                    {
-                        'name': 'closed',
-                        'transitions': [
-                            {
-                                'event': 'open',
-                                'target': 'open',
-                                'cond': lambda d: not door.locked,
-                            }
-                        ],
-                    },
-                ],
-            }
-        )
+        __statechart__ = {
+            'initial': 'closed',
+            'states': [
+                {'name': 'open'},
+                {
+                    'name': 'closed',
+                    'transitions': [
+                        {
+                            'event': 'open',
+                            'target': 'open',
+                            'cond': lambda d: not door.locked,
+                        }
+                    ],
+                },
+            ],
+        }
 
         def locked(self):
             return self.locked

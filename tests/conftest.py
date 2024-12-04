@@ -1,26 +1,24 @@
 import pytest
 
-from fluidstate import StateChart, create_machine
+from fluidstate import StateChart
 
 
 class SwitchMachine(StateChart):
-    create_machine(
-        {
-            'initial': 'off',
-            'states': [
-                {
-                    'name': 'off',
-                    'transitions': [{'event': 'toggle', 'target': 'on'}],
-                    'on_entry': 'inc_off',
-                },
-                {
-                    'name': 'on',
-                    'transitions': [{'event': 'toggle', 'target': 'off'}],
-                    'on_entry': 'inc_on',
-                },
-            ],
-        }
-    )
+    __statechart__ = {
+        'initial': 'off',
+        'states': [
+            {
+                'name': 'off',
+                'transitions': [{'event': 'toggle', 'target': 'on'}],
+                'on_entry': 'inc_off',
+            },
+            {
+                'name': 'on',
+                'transitions': [{'event': 'toggle', 'target': 'off'}],
+                'on_entry': 'inc_on',
+            },
+        ],
+    }
 
     def __init__(self):
         self.off_count = 0
@@ -41,24 +39,22 @@ def switch_machine():
 
 
 class FallingMachine(StateChart):
-    create_machine(
-        {
-            'initial': 'looking',
-            'states': [
-                {
-                    'name': 'looking',
-                    'transitions': [
-                        {
-                            'event': 'jump',
-                            'target': 'falling',
-                            'cond': ['ready_to_fly', 'high_enough'],
-                        }
-                    ],
-                },
-                {'name': 'falling'},
-            ],
-        }
-    )
+    __statechart__ = {
+        'initial': 'looking',
+        'states': [
+            {
+                'name': 'looking',
+                'transitions': [
+                    {
+                        'event': 'jump',
+                        'target': 'falling',
+                        'cond': ['ready_to_fly', 'high_enough'],
+                    }
+                ],
+            },
+            {'name': 'falling'},
+        ],
+    }
 
     def __init__(self, ready=True):
         super().__init__()

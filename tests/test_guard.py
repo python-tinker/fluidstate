@@ -1,27 +1,25 @@
 import pytest
 
-from fluidstate import GuardNotSatisfied, StateChart, create_machine
+from fluidstate import GuardNotSatisfied, StateChart
 
 
 class FallingMachine(StateChart):
-    create_machine(
-        {
-            'initial': 'looking',
-            'states': [
-                {
-                    'name': 'looking',
-                    'transitions': [
-                        {
-                            'event': 'jump',
-                            'target': 'falling',
-                            'cond': ['ready_to_fly', 'high_enough'],
-                        }
-                    ],
-                },
-                {'name': 'falling'},
-            ],
-        }
-    )
+    __statechart__ = {
+        'initial': 'looking',
+        'states': [
+            {
+                'name': 'looking',
+                'transitions': [
+                    {
+                        'event': 'jump',
+                        'target': 'falling',
+                        'cond': ['ready_to_fly', 'high_enough'],
+                    }
+                ],
+            },
+            {'name': 'falling'},
+        ],
+    }
 
     def __init__(self, ready=True):
         super().__init__()
