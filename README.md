@@ -9,7 +9,7 @@ Compact statechart that can be vendored.
 A very simple example taken from specs.
 
 ```python
->>> from fluidstate import StateChart, create_machine
+>>> from fluidstate import StateChart
 
 >>> class SimpleMachine(StateChart):
 ...     __statechart__ = {
@@ -68,7 +68,7 @@ A very simple example taken from specs.
 For demonstrating more advanced capabilities::
 
 ```python
->>> from fluidstate import StateChart, create_machine
+>>> from fluidstate import StateChart
 
 >>> class Relationship(StateChart):
 ...     __statechart__ = {
