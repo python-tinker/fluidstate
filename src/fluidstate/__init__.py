@@ -32,7 +32,6 @@ from typing import (
     Optional,
     Tuple,
     Union,
-    # cast,
 )
 
 __author__ = 'Jesse P. Johnson'
@@ -47,25 +46,20 @@ __all__ = ('StateChart', 'State', 'Transition')
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
-EventAction = Union[Callable, str]
-EventActions = Iterable[EventAction]
-GuardCondition = Union[Callable, str]
-GuardConditions = Iterable[GuardCondition]
-InitialType = Union[Callable, str]
-
-# enable_signature_truncation = False
+Content = Union[Callable, str]
+Actions = Iterable['Action']
+Guards = Iterable['Guard']
 
 
 def tuplize(value: Any) -> Tuple[Any, ...]:
     """Convert any type into a tuple."""
-    # TODO: tuplize if generator
     return tuple(value) if type(value) in (list, tuple) else (value,)
 
 
 class Action:
     """Encapsulate executable content."""
 
-    def __init__(self, content: EventAction) -> None:
+    def __init__(self, content: 'Content') -> None:
         self.content = content
 
     @classmethod
@@ -73,7 +67,6 @@ class Action:
         cls, settings: Union['Action', Callable, Dict[str, Any]]
     ) -> 'Action':
         """Create expression from configuration."""
-        print(settings)
         if isinstance(settings, cls):
             return settings
         if callable(settings) or isinstance(settings, str):
@@ -111,7 +104,7 @@ class Action:
 class Guard:
     """Control the flow of transitions to states with conditions."""
 
-    def __init__(self, condition: GuardCondition) -> None:
+    def __init__(self, condition: 'Content') -> None:
         self.condition = condition
 
     @classmethod
@@ -138,7 +131,6 @@ class Guard:
             if callable(cond):
                 return self.__evaluate_with_args(cond, *args, **kwargs)
             return bool(cond)
-        print('---------------', self.condition, type(self.condition))
         return False
 
     @staticmethod
@@ -161,9 +153,6 @@ class Guard:
 
 class Transition:
     """Provide transition capability for transitions."""
-
-    # event = cast(str, NameDescriptor())
-    # target = cast(str, NameDescriptor())
 
     def __init__(
         self,
@@ -238,7 +227,7 @@ class Transition:
 class State:
     """Represent state."""
 
-    __initial: Optional[InitialType]
+    __initial: Optional['Content']
     __on_entry: Optional[Iterable[Action]]
     __on_exit: Optional[Iterable[Action]]
 
@@ -254,12 +243,9 @@ class State:
         self.name = name
         self.__kind = kwargs.get('kind')
 
-        self.__state = self
         self.__states = {x.name: x for x in states or []}
-        # self.__states = {x.name: x for x in args if isinstance(x, State)}
 
         self.__transitions = transitions or []
-        # self.__transitions = [x for x in args if isinstance(x, Transition)]
         for x in self.transitions:
             self.__register_transition_callback(x)
 
@@ -319,7 +305,9 @@ class State:
                 initial=settings.get('initial'),
                 kind=settings.get('kind'),
                 states=(
-                    states(*settings['states']) if 'states' in settings else []
+                    list(map(State.create, settings.pop('states')))
+                    if 'states' in settings
+                    else None
                 ),
                 transitions=(
                     list(map(Transition.create, settings['transitions']))
@@ -340,7 +328,7 @@ class State:
         raise InvalidConfig('could not find a valid state configuration')
 
     @property
-    def initial(self) -> Optional[InitialType]:
+    def initial(self) -> Optional['Content']:
         """Return initial substate if defined."""
         return self.__initial
 
@@ -364,11 +352,6 @@ class State:
             # XXX: can auto to final - if self.transitions != []: else 'final'
             kind = 'atomic'
         return kind
-
-    @property
-    def substate(self) -> 'State':
-        """Current substate of this state."""
-        return self.__state
 
     @property
     def substates(self) -> Dict[str, 'State']:
@@ -442,7 +425,6 @@ class MetaStateChart(type):
                     if 'transitions' in settings
                     else None
                 ),
-                # **settings,
             )
         return obj
 
@@ -466,8 +448,6 @@ class StateChart(metaclass=MetaStateChart):
             if 'logging_level' in kwargs:
                 log.setLevel(kwargs['logging_level'].upper())
         log.info('initializing statemachine')
-
-        # self.__traverse_states = kwargs.get('traverse_states', False)
 
         if hasattr(self.__class__, '_root'):
             self.__state = self.__superstate = self.__root = deepcopy(
@@ -511,7 +491,7 @@ class StateChart(metaclass=MetaStateChart):
         raise AttributeError
 
     @property
-    def initial(self) -> Optional[InitialType]:
+    def initial(self) -> Optional['Content']:
         """Initial state of state machine."""
         return self.superstate.initial
 
@@ -619,7 +599,7 @@ class StateChart(metaclass=MetaStateChart):
         tx.run(self, *args, **kwargs)
         log.info('processed transition event %s', tx.event)
 
-    def __process_initial(self, initial: Optional[InitialType] = None) -> None:
+    def __process_initial(self, initial: Optional['Content'] = None) -> None:
         if initial:
             _initial = initial(self) if callable(initial) else initial
             self.__state = self.get_state(_initial)
