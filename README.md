@@ -12,30 +12,28 @@ A very simple example taken from specs.
 >>> from fluidstate import StateChart, create_machine
 
 >>> class SimpleMachine(StateChart):
-...     create_machine(
-...         {
-...             'name': 'machine',
-...             'initial': 'created',
-...             'states': [
-...                 {
-...                     'name': 'created',
-...                     'transitions': [
-...                         {'event': 'queue', 'target': 'waiting'},
-...                         {'event': 'cancel', 'target': 'canceled'},
-...                     ],
-...                 },
-...                 {
-...                     'name': 'waiting',
-...                     'transitions': [
-...                         {'event': 'process', 'target': 'processed'},
-...                         {'event': 'cancel', 'target': 'canceled'},
-...                     ]
-...                 },
-...                 {'name': 'processed'},
-...                 {'name': 'canceled'},
-...             ]
-...         }
-...     )
+...     __statechart__ = {
+...         'name': 'machine',
+...         'initial': 'created',
+...         'states': [
+...             {
+...                 'name': 'created',
+...                 'transitions': [
+...                     {'event': 'queue', 'target': 'waiting'},
+...                     {'event': 'cancel', 'target': 'canceled'},
+...                 ],
+...             },
+...             {
+...                 'name': 'waiting',
+...                 'transitions': [
+...                     {'event': 'process', 'target': 'processed'},
+...                     {'event': 'cancel', 'target': 'canceled'},
+...                 ]
+...             },
+...             {'name': 'processed'},
+...             {'name': 'canceled'},
+...         ]
+...     }
 
 >>> machine = SimpleMachine()
 
@@ -73,42 +71,40 @@ For demonstrating more advanced capabilities::
 >>> from fluidstate import StateChart, create_machine
 
 >>> class Relationship(StateChart):
-...     create_machine(
-...         {
-...             'initial': 'dating',
-...             'states': [
-...                 {
-...                     'name': 'dating',
-...                     'transitions': [
-...                         {
-...                             'event': 'get_intimate',
-...                             'target': 'intimate',
-...                             'cond': 'drunk',
-...                         }
-...                     ],
-...                     'on_entry': 'make_happy',
-...                     'on_exit': 'make_depressed',
-...                 },
-...                 {
-...                     'name': 'intimate',
-...                     'transitions': [
-...                         {
-...                             'event': 'get_married',
-...                             'target': 'married',
-...                             'cond': 'willing_to_give_up_manhood',
-...                         }
-...                     ],
-...                     'on_entry': 'make_very_happy',
-...                     'on_exit': 'never_speak_again',
-...                 },
-...                 {
-...                     'name': 'married',
-...                     'on_entry': 'give_up_intimacy',
-...                     'on_exit': 'buy_exotic_car',
-...                 }
-...             ]
-...         }
-...     )
+...     __statechart__ = {
+...         'initial': 'dating',
+...         'states': [
+...             {
+...                 'name': 'dating',
+...                 'transitions': [
+...                     {
+...                         'event': 'get_intimate',
+...                         'target': 'intimate',
+...                         'cond': 'drunk',
+...                     }
+...                 ],
+...                 'on_entry': 'make_happy',
+...                 'on_exit': 'make_depressed',
+...             },
+...             {
+...                 'name': 'intimate',
+...                 'transitions': [
+...                     {
+...                         'event': 'get_married',
+...                         'target': 'married',
+...                         'cond': 'willing_to_give_up_manhood',
+...                     }
+...                 ],
+...                 'on_entry': 'make_very_happy',
+...                 'on_exit': 'never_speak_again',
+...             },
+...             {
+...                 'name': 'married',
+...                 'on_entry': 'give_up_intimacy',
+...                 'on_exit': 'buy_exotic_car',
+...             }
+...         ]
+...     }
 
 ...     def strictly_for_fun(self) -> None:
 ...         pass
