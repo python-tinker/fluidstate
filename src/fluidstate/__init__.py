@@ -493,19 +493,19 @@ class StateChart(metaclass=MetaStateChart):
         """Get state from query path."""
         subpaths = statepath.split('.')
         current = self.state if statepath.startswith('.') else self.__root
-        for i, s in enumerate(subpaths):
-            if current != s:
-                current = current.substates[s]
+        for i, state in enumerate(subpaths):
+            if current != state:
+                current = current.substates[state]
             if i == (len(subpaths) - 1):
                 log.info('found state %r', current.name)
                 return current
         raise InvalidState(f"state could not be found: {statepath}")
 
-    def _change_state(self, s: str) -> None:
+    def _change_state(self, state: str) -> None:
         """Change current state to target state."""
-        log.info('changing state from %s', s)
+        log.info('changing state from %s', state)
         # XXX: might not want target selection to be callable
-        s = s(self) if callable(s) else s
+        state = state(self) if callable(state) else state
         # superstate = state.split('.')[:-1]
         # self.__supertstate = (
         #     self.get_state('.'.join(superstate))
@@ -513,14 +513,14 @@ class StateChart(metaclass=MetaStateChart):
         #     else self.__root
         # )
         self.state._run_on_exit(self)
-        self.__state = self.get_state(s)
+        self.__state = self.get_state(state)
         self.state._run_on_entry(self)
         if self.state.kind == 'compound':
             self.__superstate = self.state
             if self.state.kind == 'compound':
                 self.__process_initial(self.state.initial)
         self.__process_transient_state()
-        log.info('changed state to %s', s)
+        log.info('changed state to %s', state)
 
     def transition(
         self, event: str, statepath: Optional[str] = None
@@ -537,13 +537,13 @@ class StateChart(metaclass=MetaStateChart):
         self, event: str, *args: Any, **kwargs: Any
     ) -> None:
         # TODO: need to consider superstate transitions.
-        txs = self.state.get_transition(event)
-        # txs += self.superstate.get_transition(event)
-        if txs == []:
+        transitions = self.state.get_transition(event)
+        # transitions += self.superstate.get_transition(event)
+        if transitions == []:
             raise InvalidTransition('no transitions match event')
-        tx = self.__evaluate_guards(txs, *args, **kwargs)
-        tx.run(self, *args, **kwargs)
-        log.info('processed transition event %s', tx.event)
+        transition = self.__evaluate_guards(transitions, *args, **kwargs)
+        transition.run(self, *args, **kwargs)
+        log.info('processed transition event %s', transition.event)
 
     def __process_initial(self, initial: Optional['Content'] = None) -> None:
         if initial:
@@ -559,12 +559,12 @@ class StateChart(metaclass=MetaStateChart):
                 break
 
     def __evaluate_guards(
-        self, txs: Tuple['Transition', ...], *args: Any, **kwargs: Any
+        self, transitions: Tuple['Transition', ...], *args: Any, **kwargs: Any
     ) -> 'Transition':
         allowed = []
-        for tx in txs:
-            if tx.evaluate(self, *args, **kwargs):
-                allowed.append(tx)
+        for transition in transitions:
+            if transition.evaluate(self, *args, **kwargs):
+                allowed.append(transition)
         if len(allowed) == 0:
             raise GuardNotSatisfied(
                 'Guard is not satisfied for this transition'
