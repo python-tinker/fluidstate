@@ -30,7 +30,7 @@ class Nested(StateChart):
                     },
                     {
                         'name': 'inter2',
-                        'initial': 'inter_substate1',
+                        'initial': 'inter2_substate1',
                         'states': [
                             {
                                 'name': 'inter2_substate1',
@@ -42,7 +42,7 @@ class Nested(StateChart):
                         'transitions': [
                             {
                                 'event': 'change',
-                                'target': 'start.inter2.inter_substate1',
+                                'target': 'start.inter2.inter2_substate1',
                             }
                         ],
                     },
@@ -56,7 +56,7 @@ class Nested(StateChart):
 def test_state_iteration_order() -> None:
     """Test state iteration order is breadth-first."""
     nested = Nested()
-    assert list(nested._root) == [
+    assert [str(x) for x in nested._root] == [
         'State(root)',
         'State(start)',
         'State(end)',
@@ -75,5 +75,5 @@ def test_state_state_paths() -> None:
         'root.end',
         'root.start.inter1',
         'root.start.inter2',
-        'root.start.inter2_substate1',
+        'root.start.inter2.inter2_substate1',
     ]

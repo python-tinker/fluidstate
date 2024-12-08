@@ -23,7 +23,7 @@
 import inspect
 import logging
 from copy import deepcopy
-from itertools import chain
+from itertools import chain, zip_longest
 from typing import (
     Any,
     Callable,
@@ -49,8 +49,6 @@ log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
 Content = Union[Callable, str]
-Actions = Iterable['Action']
-Guards = Iterable['Guard']
 
 
 def tuplize(value: Any) -> Tuple[Any, ...]:
@@ -143,12 +141,6 @@ class Guard:
         params = dict(signature.parameters)
 
         if len(params.keys()) != 0:
-            # _kwargs = {k: v for k, v in kwargs.items() if k in params.keys()}
-            # _args = tuple(
-            #     x
-            #     for i, x in enumerate(params.keys())
-            #     if i < (len(params.keys()) - len(_kwargs.keys()))
-            # )
             return condition(*args, **kwargs)
         return condition()
 
@@ -160,8 +152,8 @@ class Transition:
         self,
         event: str,
         target: str,
-        action: Optional[Iterable[Action]] = None,
-        cond: Optional[Iterable[Guard]] = None,
+        action: Optional[Iterable['Action']] = None,
+        cond: Optional[Iterable['Guard']] = None,
     ) -> None:
         self.event = event
         self.target = target
@@ -230,8 +222,8 @@ class State:  # pylint: disable=too-many-instance-attributes
     """Represent state."""
 
     __initial: Optional['Content']
-    __on_entry: Optional[Iterable[Action]]
-    __on_exit: Optional[Iterable[Action]]
+    __on_entry: Optional[Iterable['Action']]
+    __on_exit: Optional[Iterable['Action']]
     __stack: List['State']
     __superstate: Optional['State']
 
@@ -269,6 +261,9 @@ class State:  # pylint: disable=too-many-instance-attributes
 
     def __repr__(self) -> str:
         return repr(f"State({self.name})")
+
+    def __str__(self) -> str:
+        return f"State({self.name})"
 
     def __iter__(self) -> 'State':
         self.__stack = [self]
@@ -471,7 +466,7 @@ class StateChart(metaclass=MetaStateChart):
         log.info('initializing statemachine')
 
         if hasattr(self.__class__, '_root'):
-            self.__state = self.__root = deepcopy(self.__class__._root)
+            self.__state = deepcopy(self.__class__._root)
         else:
             raise InvalidConfig(
                 'attempted initialization with empty superstate'
@@ -486,11 +481,13 @@ class StateChart(metaclass=MetaStateChart):
         log.info('statemachine initialization complete')
 
     def __getattr__(self, name: str) -> Any:
+        # ignore private attribute lookups
         if name.startswith('__'):
             raise AttributeError
 
+        # handle state check for active states
         if name.startswith('is_'):
-            return self.state.name == name[3:]
+            return name[3:] in self.active
 
         # if self.state.kind == 'final':
         #     raise InvalidTransition('final state cannot transition')
@@ -500,6 +497,11 @@ class StateChart(metaclass=MetaStateChart):
                 # pylint: disable-next=unnecessary-dunder-call
                 return t.callback().__get__(self, self.__class__)
         raise AttributeError(f"unable to find {name!r} attribute")
+
+    @property
+    def active(self) -> Tuple['State', ...]:
+        """Return active states."""
+        return tuple(reversed(self.state))
 
     @property
     def initial(self) -> Optional['Content']:
@@ -528,44 +530,102 @@ class StateChart(metaclass=MetaStateChart):
     @property
     def state(self) -> 'State':
         """Return the current state."""
-        try:
-            return self.__state
-        except Exception as exc:
-            log.error('state is undefined')
-            raise KeyError from exc
+        return self.__state
+
+    def get_relpath(self, target: str) -> str:
+        """Get relative statepath of target state to current state."""
+        if target in ('', self.state):  # self reference
+            relpath = '.'
+        else:  # need to determine if state is ascendent of descendent
+            path = ['']
+            source_path = self.state.path.split('.')
+            target_path = self.get_state(target).path.split('.')
+            for i, x in enumerate(
+                zip_longest(source_path, target_path, fillvalue='')
+            ):  # match the paths to walk either up or down from current
+                if x[0] != x[1]:
+                    if x[0] != '':  # target is a descendent
+                        path.extend(['' for x in source_path[i:]])
+                    if x[1] == '':  # target is a ascendent
+                        path.extend([''])
+                    if x[1] != '':  # target is child of a ascendent
+                        path.extend(target_path[i:])
+                    if i == 0:
+                        raise InvalidState(
+                            f"no relative path exists for: {target!s}"
+                        )
+                    break
+            relpath = '.'.join(path)
+        return relpath
 
     def get_state(self, statepath: str) -> 'State':
-        """Get state from query path."""
-        subpaths = statepath.split('.')
-        current = self.state if statepath.startswith('.') else self.__root
-        for i, state in enumerate(subpaths):
-            if current != state:
-                current = current.substates[state]
-            if i == (len(subpaths) - 1):
-                log.info('found state %r', current.name)
-                return current
+        """Get state."""
+        state: 'State' = self._root
+        macrostep = statepath.split('.')
+
+        # general recursive search for single query
+        if len(macrostep) == 1:
+            for x in list(state):
+                if x == macrostep[0]:
+                    return x
+        # set start point for relative lookups
+        elif statepath.startswith('.'):
+            relative = len(statepath) - len(statepath.lstrip('.')) - 1
+            state = self.active[relative:][0]
+            rel = relative + 1
+            macrostep = [state.name] + macrostep[rel:]
+
+        # check relative lookup is done
+        target = macrostep[-1]
+        if target in ('', state):
+            return state
+
+        # path based search
+        while state and macrostep:
+            microstep = macrostep.pop(0)
+            # skip if current state is at microstep
+            if state == microstep:
+                continue
+            # return current state if target found
+            if state == target:
+                return state
+            # walk path if exists
+            if hasattr(state, 'states') and microstep in state.states.keys():
+                state = state.states[microstep]
+                # check if target is found
+                if not macrostep:
+                    return state
+            else:
+                break
         raise InvalidState(f"state could not be found: {statepath}")
 
-    def _change_state(self, state: str) -> None:
-        """Change current state to target state."""
-        log.info('changing state from %s', state)
-        # XXX: might not want target selection to be callable
-        state = state(self) if callable(state) else state
-        # superstate = state.split('.')[:-1]
-        # self.__supertstate = (
-        #     self.get_state('.'.join(superstate))
-        #     if superstate != []
-        #     else self.__root
-        # )
-        self.state._run_on_exit(self)
-        self.__state = self.get_state(state)
-        self.state._run_on_entry(self)
-        if self.state.kind == 'compound':
-            # self.__superstate = self.state
-            if self.state.kind == 'compound':
-                self.__process_initial(self.state.initial)
-        self.__process_transient_state()
-        log.info('changed state to %s', state)
+    def _change_state(self, statepath: str) -> None:
+        """Traverse statepath."""
+        relpath = self.get_relpath(statepath)
+        if relpath == '.':  # handle self transition
+            self.state._run_on_exit(self)
+            self.state._run_on_entry(self)
+        else:
+            s = 2 if relpath.endswith('.') else 1  # stupid black
+            macrostep = relpath.split('.')[s:]
+            for microstep in macrostep:
+                try:
+                    if microstep == '':  # reverse
+                        self.state._run_on_exit(self)
+                        self.__state = self.active[1]
+                    elif (
+                        isinstance(self.state, State)
+                        and microstep in self.state.substates.keys()
+                    ):  # forward
+                        state = self.state.substates[microstep]
+                        self.__state = state
+                        state._run_on_entry(self)
+                    else:
+                        raise InvalidState(f"statepath not found: {statepath}")
+                except Exception as err:
+                    log.error(err)
+                    raise KeyError('parent is undefined') from err
+        log.info('changed state to %s', statepath)
 
     def transition(
         self, event: str, statepath: Optional[str] = None
@@ -584,7 +644,7 @@ class StateChart(metaclass=MetaStateChart):
         # TODO: need to consider superstate transitions.
         transitions = self.state.get_transition(event)
         # transitions += self.superstate.get_transition(event)
-        if transitions == []:
+        if not transitions:
             raise InvalidTransition('no transitions match event')
         transition = self.__evaluate_guards(transitions, *args, **kwargs)
         transition.run(self, *args, **kwargs)
@@ -592,8 +652,8 @@ class StateChart(metaclass=MetaStateChart):
 
     def __process_initial(self, initial: Optional['Content'] = None) -> None:
         if initial:
-            _initial = initial(self) if callable(initial) else initial
-            self.__state = self.get_state(_initial)
+            statepath = initial(self) if callable(initial) else initial
+            self.__state = self.get_state(statepath)
         else:
             raise InvalidConfig('an initial state must exist for statechart')
 
@@ -610,7 +670,7 @@ class StateChart(metaclass=MetaStateChart):
         for transition in transitions:
             if transition.evaluate(self, *args, **kwargs):
                 allowed.append(transition)
-        if len(allowed) == 0:
+        if not allowed:
             raise GuardNotSatisfied(
                 'Guard is not satisfied for this transition'
             )
