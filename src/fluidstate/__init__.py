@@ -23,10 +23,12 @@
 import inspect
 import logging
 from copy import deepcopy
+from itertools import chain
 from typing import (
     Any,
     Callable,
     Dict,
+    Generator,
     Iterable,
     List,
     Optional,
@@ -224,12 +226,14 @@ class Transition:
             log.info("no action event for %r", self.event)
 
 
-class State:
+class State:  # pylint: disable=too-many-instance-attributes
     """Represent state."""
 
     __initial: Optional['Content']
     __on_entry: Optional[Iterable[Action]]
     __on_exit: Optional[Iterable[Action]]
+    __stack: List['State']
+    __superstate: Optional['State']
 
     def __init__(
         self,
@@ -241,19 +245,20 @@ class State:
         if not name.replace('_', '').isalnum():
             raise InvalidConfig('state name contains invalid characters')
         self.name = name
+        self.__superstate: Optional['State'] = None
         self.__kind = kwargs.get('kind')
         self.__initial = kwargs.get('initial')
-        self.__states = {x.name: x for x in states or []}
+        self.__substates = {}
+        for state in states or []:
+            state.superstate = self
+            self.__substates[state.name] = state
         self.__transitions = transitions or []
-        for x in self.transitions:
-            self.__register_transition_callback(x)
+        for transition in self.transitions:
+            self.__register_transition_callback(transition)
         # FIXME: pseudostates should not include triggers
         self.__on_entry = kwargs.get('on_entry')
         self.__on_exit = kwargs.get('on_exit')
         self.__validate_state()
-
-    def __repr__(self) -> str:
-        return repr(f"State({self.name})")
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, State):
@@ -261,6 +266,31 @@ class State:
         if isinstance(other, str):
             return self.name == other
         return False
+
+    def __repr__(self) -> str:
+        return repr(f"State({self.name})")
+
+    def __iter__(self) -> 'State':
+        self.__stack = [self]
+        return self
+
+    def __next__(self) -> 'State':
+        # simple breadth-first iteration
+        if self.__stack:
+            x = self.__stack.pop()
+            if isinstance(x, State):
+                self.__stack = list(
+                    # XXX: why is chain appending in reverse?!?
+                    chain(reversed(x.substates.values()), self.__stack)
+                )
+            return x
+        raise StopIteration
+
+    def __reversed__(self) -> Generator['State', None, None]:
+        target: Optional['State'] = self
+        while target:
+            yield target
+            target = target.superstate
 
     def __register_transition_callback(self, t: 'Transition') -> None:
         # XXX: currently mapping to class instead of instance
@@ -275,7 +305,7 @@ class State:
     def __validate_state(self) -> None:
         # TODO: empty statemachine should default to null event
         if self.kind == 'compund':
-            if len(self.__states) < 2:
+            if len(self.__substates) < 2:
                 raise InvalidConfig('There must be at least two states')
             if not self.initial:
                 raise InvalidConfig('There must exist an initial state')
@@ -337,9 +367,26 @@ class State:
         return kind
 
     @property
+    def path(self) -> str:
+        """Get the statepath of this state."""
+        return '.'.join(reversed([x.name for x in reversed(self)]))
+
+    @property
     def substates(self) -> Dict[str, 'State']:
         """Return substates."""
-        return self.__states
+        return self.__substates or {}
+
+    @property
+    def superstate(self) -> Optional['State']:
+        """Get superstate state."""
+        return self.__superstate
+
+    @superstate.setter
+    def superstate(self, state: 'State') -> None:
+        if self.__superstate is None:
+            self.__superstate = state
+        else:
+            raise FluidstateException('cannot change superstate for state')
 
     @property
     def transitions(self) -> Tuple['Transition', ...]:
@@ -424,9 +471,7 @@ class StateChart(metaclass=MetaStateChart):
         log.info('initializing statemachine')
 
         if hasattr(self.__class__, '_root'):
-            self.__state = self.__superstate = self.__root = deepcopy(
-                self.__class__._root
-            )
+            self.__state = self.__root = deepcopy(self.__class__._root)
         else:
             raise InvalidConfig(
                 'attempted initialization with empty superstate'
@@ -473,7 +518,7 @@ class StateChart(metaclass=MetaStateChart):
     @property
     def superstate(self) -> 'State':
         """Return superstate."""
-        return self.__superstate
+        return self.state.superstate or self._root
 
     @property
     def states(self) -> Tuple['State', ...]:
@@ -516,7 +561,7 @@ class StateChart(metaclass=MetaStateChart):
         self.__state = self.get_state(state)
         self.state._run_on_entry(self)
         if self.state.kind == 'compound':
-            self.__superstate = self.state
+            # self.__superstate = self.state
             if self.state.kind == 'compound':
                 self.__process_initial(self.state.initial)
         self.__process_transient_state()
