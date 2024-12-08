@@ -49,6 +49,7 @@ log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
 Content = Union[Callable, str]
+Condition = Union[Content, bool]
 
 
 def tuplize(value: Any) -> Tuple[Any, ...]:
@@ -82,11 +83,6 @@ class Action:
         **kwargs: Any,
     ) -> Any:
         """Run the action."""
-        return self._run_action(machine, *args, **kwargs)
-
-    def _run_action(
-        self, machine: 'StateChart', *args: Any, **kwargs: Any
-    ) -> Any:
         if callable(self.content):
             return self.__run_with_args(self.content, machine, *args, **kwargs)
         return self.__run_with_args(
@@ -104,12 +100,12 @@ class Action:
 class Guard:
     """Control the flow of transitions to states with conditions."""
 
-    def __init__(self, condition: 'Content') -> None:
+    def __init__(self, condition: 'Condition') -> None:
         self.condition = condition
 
     @classmethod
     def create(
-        cls, settings: Union['Guard', Callable, Dict[str, Any]]
+        cls, settings: Union['Guard', Callable, Dict[str, Any], bool]
     ) -> 'Guard':
         """Create expression from configuration."""
         if isinstance(settings, cls):
@@ -118,6 +114,8 @@ class Guard:
             return cls(settings)
         if isinstance(settings, dict):
             return cls(**settings)
+        if isinstance(settings, bool):
+            return cls(condition=settings)
         raise InvalidConfig('could not find a valid configuration for guard')
 
     def evaluate(
@@ -129,20 +127,13 @@ class Guard:
         if isinstance(self.condition, str):
             cond = getattr(machine, self.condition)
             if callable(cond):
-                return self.__evaluate_with_args(cond, *args, **kwargs)
+                if len(dict((inspect.signature(cond)).parameters).keys()) != 0:
+                    return cond(*args, **kwargs)
+                return cond()
             return bool(cond)
+        if isinstance(self.condition, bool):
+            return self.condition
         return False
-
-    @staticmethod
-    def __evaluate_with_args(
-        condition: Callable, *args: Any, **kwargs: Any
-    ) -> bool:
-        signature = inspect.signature(condition)
-        params = dict(signature.parameters)
-
-        if len(params.keys()) != 0:
-            return condition(*args, **kwargs)
-        return condition()
 
 
 class Transition:
@@ -388,7 +379,7 @@ class State:  # pylint: disable=too-many-instance-attributes
         """Return transitions of this state."""
         return tuple(self.__transitions)
 
-    def get_transition(self, event: str) -> Tuple['Transition', ...]:
+    def get_transitions(self, event: str) -> Tuple['Transition', ...]:
         """Get each transition maching event."""
         return tuple(
             filter(
@@ -568,7 +559,7 @@ class StateChart(metaclass=MetaStateChart):
             for x in list(state):
                 if x == macrostep[0]:
                     return x
-        # set start point for relative lookups
+        # set start point if using relative lookup
         elif statepath.startswith('.'):
             relative = len(statepath) - len(statepath.lstrip('.')) - 1
             state = self.active[relative:][0]
@@ -642,8 +633,8 @@ class StateChart(metaclass=MetaStateChart):
         self, event: str, *args: Any, **kwargs: Any
     ) -> None:
         # TODO: need to consider superstate transitions.
-        transitions = self.state.get_transition(event)
-        # transitions += self.superstate.get_transition(event)
+        transitions = self.state.get_transitions(event)
+        # transitions += self.superstate.get_transitions(event)
         if not transitions:
             raise InvalidTransition('no transitions match event')
         transition = self.__evaluate_guards(transitions, *args, **kwargs)
