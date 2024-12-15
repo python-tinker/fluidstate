@@ -60,7 +60,7 @@ def test_every_callback_is_callable():
             'on_exit looking',
             'pre falling',
             'action jump',
-            'guard jump',
+            'guard jump',  # FIXME: conditions should be immutable
         ]
     )
 

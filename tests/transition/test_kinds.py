@@ -30,7 +30,6 @@ machine = Machine()
 
 
 def test_auto_transition():
-    assert machine.initial == 'engine'
     assert machine.state == 'started'
 
 

@@ -2,66 +2,63 @@
 
 import time
 
-from fluidstate import StateChart, State, create_machine
+from fluidstate import Action, State, StateChart, Transition
 
 
 def get_stoplight(name: str, initial: str = 'red') -> State:
-    return create_machine(
-        {
-            'name': name,
-            'initial': initial,
-            'states': [
-                {
-                    'name': 'red',
-                    'transitions': [
-                        {
-                            'event': 'turn_green',
-                            'target': 'green',
-                            'action': lambda: time.sleep(5),
-                        }
-                    ],
-                    'on_entry': lambda: print('Red Light!'),
-                },
-                {
-                    'name': 'yellow',
-                    'transitions': [
-                        {
-                            'event': 'turn_red',
-                            'target': 'red',
-                            'action': lambda: time.sleep(5),
-                        }
-                    ],
-                    'on_entry': lambda: print('Yellow light!'),
-                },
-                {
-                    'name': 'green',
-                    'transitions': [
-                        {
-                            'event': 'turn_yellow',
-                            'target': 'yellow',
-                            'action': lambda: time.sleep(2),
-                        }
-                    ],
-                    'on_entry': lambda: print('Green light!'),
-                },
-            ],
-        }
+    """Get a stoplight state machine."""
+    return State(
+        name=name,
+        initial=initial,
+        states=[
+            State(
+                name='red',
+                transitions=[
+                    Transition(
+                        event='turn_green',
+                        target='green',
+                        action=[Action(lambda: time.sleep(5))],
+                    )
+                ],
+                on_entry=Action(lambda: print('Red Light!')),
+            ),
+            State(
+                name='yellow',
+                transitions=[
+                    Transition(
+                        event='turn_red',
+                        target='red',
+                        action=[Action(lambda: time.sleep(5))],
+                    )
+                ],
+                on_entry=Action(lambda: print('Yellow light!')),
+            ),
+            State(
+                name='green',
+                transitions=[
+                    Transition(
+                        event='turn_yellow',
+                        target='yellow',
+                        action=[Action(lambda: time.sleep(2))],
+                    )
+                ],
+                on_entry=Action(lambda: print('Green light!')),
+            ),
+        ],
     )
 
 
 class Intersection(StateChart):
     """Provide an object representing an intersection."""
 
-    create_machine(
-        {
-            'name': 'intersection',
-            'kind': 'parallel',
-            'states': [
-                get_stoplight('north_sourth', 'red'),
-                get_stoplight('east_west', 'green'),
-            ],
-        }
-    )
+    __statechart__ = {
+        'name': 'intersection',
+        'kind': 'parallel',
+        'states': [
+            get_stoplight('north_sourth', 'red'),
+            get_stoplight('east_west', 'green'),
+        ],
+    }
 
     def _change_red(self) -> None:
         print(f"turning intersection {self.state} red")
