@@ -381,14 +381,6 @@ class State:  # pylint: disable=too-many-instance-attributes
         """Return transitions of this state."""
         return tuple(self.__transitions)
 
-    def get_transitions(self, event: str) -> Tuple['Transition', ...]:
-        """Get each transition maching event."""
-        return tuple(
-            filter(
-                lambda transition: transition.event == event, self.transitions
-            )
-        )
-
     def _run_on_entry(self, machine: 'StateChart') -> None:
         if self.__on_entry is not None:
             for action in self.__on_entry:
@@ -594,6 +586,14 @@ class StateChart(metaclass=MetaStateChart):
                 break
         raise InvalidState(f"state could not be found: {statepath}")
 
+    def get_transitions(self, event: str) -> Tuple['Transition', ...]:
+        """Get each transition maching event."""
+        return tuple(
+            filter(
+                lambda transition: transition.event == event, self.transitions
+            )
+        )
+
     def _change_state(self, statepath: str) -> None:
         """Traverse statepath."""
         relpath = self.get_relpath(statepath)
@@ -643,8 +643,7 @@ class StateChart(metaclass=MetaStateChart):
         self, event: str, *args: Any, **kwargs: Any
     ) -> None:
         # TODO: need to consider superstate transitions.
-        transitions = self.state.get_transitions(event)
-        # transitions += self.superstate.get_transitions(event)
+        transitions = self.get_transitions(event)
         if not transitions:
             raise InvalidTransition('no transitions match event')
         transition = self.__evaluate_guards(transitions, *args, **kwargs)
