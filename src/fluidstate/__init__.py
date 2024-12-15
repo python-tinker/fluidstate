@@ -28,8 +28,8 @@ from typing import (
     Any,
     Callable,
     Dict,
-    Generator,
     Iterable,
+    Iterator,
     List,
     Optional,
     Tuple,
@@ -272,7 +272,7 @@ class State:  # pylint: disable=too-many-instance-attributes
             return x
         raise StopIteration
 
-    def __reversed__(self) -> Generator['State', None, None]:
+    def __reversed__(self) -> Iterator['State']:
         target: Optional['State'] = self
         while target:
             yield target
@@ -290,11 +290,13 @@ class State:  # pylint: disable=too-many-instance-attributes
 
     def __validate_state(self) -> None:
         # TODO: empty statemachine should default to null event
-        if self.kind == 'compund':
+        if self.kind == 'compound':
             if len(self.__substates) < 2:
-                raise InvalidConfig('There must be at least two states')
-            if not self.initial:
-                raise InvalidConfig('There must exist an initial state')
+                raise InvalidConfig(
+                    'There must be at least two states', self.name
+                )
+            # if not self.initial:
+            #     raise InvalidConfig('There must exist an initial state')
         if self.kind == 'final' and self.__on_exit:
             log.warning('final state will never run "on_exit" action')
         log.info('evaluated state')
@@ -439,6 +441,8 @@ class MetaStateChart(type):
 class StateChart(metaclass=MetaStateChart):
     """Provide state management capability."""
 
+    __initial: 'State'
+
     def __init__(
         self,
         initial: Optional[Union[Callable, str]] = None,
@@ -463,7 +467,15 @@ class StateChart(metaclass=MetaStateChart):
                 'attempted initialization with empty superstate'
             )
 
-        self.__process_initial(initial or self.superstate.initial)
+        current = initial or self._root.initial
+        if current:
+            self.__state = self.get_state(
+                current(self) if callable(current) else current
+            )
+        elif self.states:
+            self.__state = self.states[0]
+        else:
+            raise InvalidConfig('an initial state must exist for statechart')
         log.info('loaded states and transitions')
 
         if kwargs.get('enable_start_transition', True):
@@ -495,18 +507,10 @@ class StateChart(metaclass=MetaStateChart):
         return tuple(reversed(self.state))
 
     @property
-    def initial(self) -> Optional['Content']:
-        """Initial state of state machine."""
-        return self.superstate.initial
-
-    @property
-    def transitions(self) -> Tuple['Transition', ...]:
+    def transitions(self) -> Iterator['Transition']:
         """Return list of current transitions."""
-        return (
-            tuple(self.state.transitions)
-            if hasattr(self.state, 'transitions')
-            else ()
-        )
+        for state in self.active:
+            yield from state.transitions
 
     @property
     def superstate(self) -> 'State':
@@ -629,6 +633,12 @@ class StateChart(metaclass=MetaStateChart):
                 return t.callback().__get__(self, self.__class__)
         return None
 
+    def __process_transient_state(self) -> None:
+        for x in self.state.transitions:
+            if x.event == '':
+                self._auto_()
+                break
+
     def _process_transitions(
         self, event: str, *args: Any, **kwargs: Any
     ) -> None:
@@ -640,19 +650,6 @@ class StateChart(metaclass=MetaStateChart):
         transition = self.__evaluate_guards(transitions, *args, **kwargs)
         transition.run(self, *args, **kwargs)
         log.info('processed transition event %s', transition.event)
-
-    def __process_initial(self, initial: Optional['Content'] = None) -> None:
-        if initial:
-            statepath = initial(self) if callable(initial) else initial
-            self.__state = self.get_state(statepath)
-        else:
-            raise InvalidConfig('an initial state must exist for statechart')
-
-    def __process_transient_state(self) -> None:
-        for x in self.state.transitions:
-            if x.event == '':
-                self._auto_()
-                break
 
     def __evaluate_guards(
         self, transitions: Tuple['Transition', ...], *args: Any, **kwargs: Any

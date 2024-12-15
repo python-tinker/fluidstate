@@ -3,36 +3,39 @@ import pytest
 from fluidstate import InvalidConfig, StateChart, State
 
 
-def test_it_requires_at_least_two_states():
-    class MyMachine(StateChart):
-        pass
+def test_it_requires_at_least_root_state() -> None:
+    class Machine(StateChart):
+        """Example machine without a root state."""
 
-    # There must be at least two states
+    # There must be a root state
     with pytest.raises(InvalidConfig):
-        MyMachine()
+        Machine()
 
-    class OtherMachine(StateChart):
-        __statechart__ = {'states': [State('open')]}
 
-    # There must be at least two states
+def test_it_requires_at_least_two_states() -> None:
     with pytest.raises(InvalidConfig):
-        OtherMachine()
+
+        class Machine(StateChart):
+            """Example compound state missing minimal substates."""
+
+            __statechart__ = {'states': [State('open')]}
 
 
 def test_it_requires_an_initial():
-    class MyMachine(StateChart):
+    class Machine(StateChart):
         __statechart__ = {'states': [State('open'), State('closed')]}
 
-    # There must be at least two states
-    with pytest.raises(InvalidConfig):
-        MyMachine()
+    machine = Machine()
+    assert machine.state == 'open'
 
-    class AnotherMachine(StateChart):
+
+def test_initial_state_default() -> None:
+    class Machine(StateChart):
         __statechart__ = {
             'initial': None,
             'states': [State('open'), State('closed')],
         }
 
     # An initial state must exist.
-    with pytest.raises(InvalidConfig):
-        AnotherMachine()
+    machine = Machine()
+    assert machine.state == 'open'

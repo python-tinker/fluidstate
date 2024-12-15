@@ -38,6 +38,7 @@ class Nested(StateChart):
                                     {'event': 'change', 'target': 'end'},
                                 ],
                             },
+                            {'name': 'inter2_substate2'},
                         ],
                         'transitions': [
                             {
@@ -63,6 +64,7 @@ def test_state_iteration_order() -> None:
         'State(inter1)',
         'State(inter2)',
         'State(inter2_substate1)',
+        'State(inter2_substate2)',
     ]
 
 
@@ -76,4 +78,5 @@ def test_state_state_paths() -> None:
         'root.start.inter1',
         'root.start.inter2',
         'root.start.inter2.inter2_substate1',
+        'root.start.inter2.inter2_substate2',
     ]
