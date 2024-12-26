@@ -53,7 +53,7 @@ class Intersection(StateChart):
 
     __statechart__ = {
         'name': 'intersection',
-        'kind': 'parallel',
+        'type': 'parallel',
         'states': [
             get_stoplight('north_sourth', 'red'),
             get_stoplight('east_west', 'green'),
