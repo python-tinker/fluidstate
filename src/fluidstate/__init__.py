@@ -180,7 +180,7 @@ class Transition:
         """Provide callback capbility."""
 
         def event(machine: 'StateChart', *args: Any, **kwargs: Any) -> None:
-            machine._process_transitions(self.event, *args, **kwargs)
+            machine._process_event(self.event, *args, **kwargs)
 
         event.__name__ = self.event
         event.__doc__ = f"Show event: '{self.event}'."
@@ -229,7 +229,7 @@ class State:  # pylint: disable=too-many-instance-attributes
             raise InvalidConfig('state name contains invalid characters')
         self.name = name
         self.__superstate: Optional['State'] = None
-        self.__kind = kwargs.get('kind')
+        self.__type = kwargs.get('type')
         self.__initial = kwargs.get('initial')
         self.__substates = {}
         for state in states or []:
@@ -290,14 +290,12 @@ class State:  # pylint: disable=too-many-instance-attributes
 
     def __validate_state(self) -> None:
         # TODO: empty statemachine should default to null event
-        if self.kind == 'compound':
+        if self.type == 'compound':
             if len(self.__substates) < 2:
                 raise InvalidConfig(
                     'There must be at least two states', self.name
                 )
-            # if not self.initial:
-            #     raise InvalidConfig('There must exist an initial state')
-        if self.kind == 'final' and self.__on_exit:
+        if self.type == 'final' and self.__on_exit:
             log.warning('final state will never run "on_exit" action')
         log.info('evaluated state')
 
@@ -312,7 +310,7 @@ class State:  # pylint: disable=too-many-instance-attributes
             return settings.get('factory', cls)(
                 name=settings['name'],
                 initial=settings.get('initial'),
-                kind=settings.get('kind'),
+                type=settings.get('type'),
                 states=(
                     list(map(State.create, settings.pop('states')))
                     if 'states' in settings
@@ -342,17 +340,13 @@ class State:  # pylint: disable=too-many-instance-attributes
         return self.__initial
 
     @property
-    def kind(self) -> str:
+    def type(self) -> str:
         """Return state type."""
-        if self.__kind:
-            kind = self.__kind
-        elif self.substates:
-            kind = 'compound'
-        else:
-            # FIXME: error when enterin atomic state
-            # kind = 'atomic' if self.transitions else 'final'
-            kind = 'atomic'
-        return kind
+        if self.__type:
+            return self.__type
+        if self.substates:
+            return 'compound'
+        return 'atomic'
 
     @property
     def path(self) -> str:
@@ -362,7 +356,7 @@ class State:  # pylint: disable=too-many-instance-attributes
     @property
     def substates(self) -> Dict[str, 'State']:
         """Return substates."""
-        return self.__substates or {}
+        return self.__substates
 
     @property
     def superstate(self) -> Optional['State']:
@@ -382,20 +376,18 @@ class State:  # pylint: disable=too-many-instance-attributes
         return tuple(self.__transitions)
 
     def _run_on_entry(self, machine: 'StateChart') -> None:
-        if self.__on_entry is not None:
-            for action in self.__on_entry:
-                action.run(machine)
-                log.info(
-                    "executed 'on_entry' state change action for %s", self.name
-                )
+        for action in self.__on_entry or []:
+            action.run(machine)
+            log.info(
+                "executed 'on_entry' state change action for %s", self.name
+            )
 
     def _run_on_exit(self, machine: 'StateChart') -> None:
-        if self.__on_exit is not None:
-            for action in self.__on_exit:
-                action.run(machine)
-                log.info(
-                    "executed 'on_exit' state change action for %s", self.name
-                )
+        for action in self.__on_exit or []:
+            action.run(machine)
+            log.info(
+                "executed 'on_exit' state change action for %s", self.name
+            )
 
 
 class MetaStateChart(type):
@@ -415,7 +407,7 @@ class MetaStateChart(type):
             obj._root = settings.pop('factory', State)(
                 name=settings.pop('name', 'root'),
                 initial=settings.pop('initial', None),
-                kind=settings.pop('kind', None),
+                type=settings.pop('type', None),
                 states=(
                     list(map(State.create, settings.pop('states')))
                     if 'states' in settings
@@ -484,13 +476,22 @@ class StateChart(metaclass=MetaStateChart):
         if name.startswith('is_'):
             return name[3:] in self.active
 
-        # if self.state.kind == 'final':
-        #     raise InvalidTransition('final state cannot transition')
+        # handle automatic transitions
+        # if name == '_auto_':
 
-        for t in self.transitions:
-            if t.event == name or (t.event == '' and name == '_auto_'):
-                # pylint: disable-next=unnecessary-dunder-call
-                return t.callback().__get__(self, self.__class__)
+        #     def wrapper(*args: Any, **kwargs: Any) -> Optional[Any]:
+        #         return self.trigger('', *args, **kwargs)
+
+        #     return wrapper
+
+        # handle transition as function by event name
+        if self.state.type != 'final':
+            for t in self.transitions:
+                if t.event == name or (t.event == '' and name == '_auto_'):
+                    # pylint: disable-next=unnecessary-dunder-call
+                    return t.callback().__get__(self, self.__class__)
+        else:
+            raise InvalidTransition('cannot transition from final state')
         raise AttributeError(f"unable to find {name!r} attribute")
 
     @property
@@ -617,15 +618,17 @@ class StateChart(metaclass=MetaStateChart):
                         state._run_on_entry(self)
                     else:
                         raise InvalidState(f"statepath not found: {statepath}")
-                except Exception as err:
+                except FluidstateException as err:
                     log.error(err)
-                    raise KeyError('parent is undefined') from err
+                    raise KeyError('superstate is undefined') from err
         log.info('changed state to %s', statepath)
 
-    def transition(
-        self, event: str, statepath: Optional[str] = None
+    def trigger(
+        self, event: str, /, statepath: Optional[str] = None
     ) -> Optional[Any]:
         """Transition from one state to another."""
+        if self.state.type == 'final':
+            raise InvalidTransition('cannot transition from final state')
         s = self.get_state(statepath) if statepath else self.state
         for t in s.transitions:
             if t.event == event:
@@ -639,20 +642,11 @@ class StateChart(metaclass=MetaStateChart):
                 self._auto_()
                 break
 
-    def _process_transitions(
-        self, event: str, *args: Any, **kwargs: Any
-    ) -> None:
+    def _process_event(self, event: str, *args: Any, **kwargs: Any) -> None:
         # TODO: need to consider superstate transitions.
         transitions = self.get_transitions(event)
         if not transitions:
             raise InvalidTransition('no transitions match event')
-        transition = self.__evaluate_guards(transitions, *args, **kwargs)
-        transition.run(self, *args, **kwargs)
-        log.info('processed transition event %s', transition.event)
-
-    def __evaluate_guards(
-        self, transitions: Tuple['Transition', ...], *args: Any, **kwargs: Any
-    ) -> 'Transition':
         allowed = []
         for transition in transitions:
             if transition.evaluate(self, *args, **kwargs):
@@ -666,7 +660,8 @@ class StateChart(metaclass=MetaStateChart):
                 'More than one transition was allowed for this event'
             )
         log.info('processed guard for %s', allowed[0].event)
-        return allowed[0]
+        allowed[0].run(self, *args, **kwargs)
+        log.info('processed transition event %s', allowed[0].event)
 
 
 class FluidstateException(Exception):
