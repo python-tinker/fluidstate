@@ -22,7 +22,6 @@
 
 import inspect
 import logging
-from copy import deepcopy
 from itertools import chain, zip_longest
 from typing import (
     Any,
@@ -393,7 +392,7 @@ class State:  # pylint: disable=too-many-instance-attributes
 class MetaStateChart(type):
     """Provide capability to populate configuration for statemachine ."""
 
-    _root: 'State'
+    main: 'State'
 
     def __new__(
         mcs,
@@ -401,11 +400,11 @@ class MetaStateChart(type):
         bases: Tuple[type, ...],
         attrs: Dict[str, Any],
     ) -> 'MetaStateChart':
+        settings = attrs.pop('__statechart__', None)
         obj = super().__new__(mcs, name, bases, attrs)
-        if '__statechart__' in attrs:
-            settings = attrs.pop('__statechart__')
-            obj._root = settings.pop('factory', State)(
-                name=settings.pop('name', 'root'),
+        if settings:
+            obj.main = settings.pop('factory', State)(
+                name=settings.pop('name', 'main'),
                 initial=settings.pop('initial', None),
                 type=settings.pop('type', None),
                 states=(
@@ -444,14 +443,14 @@ class StateChart(metaclass=MetaStateChart):
                 log.setLevel(kwargs['logging_level'].upper())
         log.info('initializing statemachine')
 
-        if hasattr(self.__class__, '_root'):
-            self.__state = deepcopy(self.__class__._root)
+        if hasattr(self.__class__, 'main'):
+            self.__state = self.__class__.main
         else:
             raise InvalidConfig(
                 'attempted initialization with empty superstate'
             )
 
-        current = initial or self._root.initial
+        current = initial or self.main.initial
         if current:
             self.__state = self.get_state(
                 current(self) if callable(current) else current
@@ -508,7 +507,7 @@ class StateChart(metaclass=MetaStateChart):
     @property
     def superstate(self) -> 'State':
         """Return superstate."""
-        return self.state.superstate or self._root
+        return self.state.superstate or self.main
 
     @property
     def states(self) -> Tuple['State', ...]:
@@ -548,7 +547,7 @@ class StateChart(metaclass=MetaStateChart):
 
     def get_state(self, statepath: str) -> 'State':
         """Get state."""
-        state: 'State' = self._root
+        state: 'State' = self.main
         macrostep = statepath.split('.')
 
         # general recursive search for single query

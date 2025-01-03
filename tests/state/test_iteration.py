@@ -57,8 +57,8 @@ class Nested(StateChart):
 def test_state_iteration_order() -> None:
     """Test state iteration order is breadth-first."""
     nested = Nested()
-    assert [str(x) for x in nested._root] == [
-        'State(root)',
+    assert [str(x) for x in nested.main] == [
+        'State(main)',
         'State(start)',
         'State(end)',
         'State(inter1)',
@@ -71,12 +71,12 @@ def test_state_iteration_order() -> None:
 def test_state_state_paths() -> None:
     """Test state contains path in tree."""
     nested = Nested()
-    assert list(x.path for x in nested._root) == [
-        'root',
-        'root.start',
-        'root.end',
-        'root.start.inter1',
-        'root.start.inter2',
-        'root.start.inter2.inter2_substate1',
-        'root.start.inter2.inter2_substate2',
+    assert list(x.path for x in nested.main) == [
+        'main',
+        'main.start',
+        'main.end',
+        'main.start.inter1',
+        'main.start.inter2',
+        'main.start.inter2.inter2_substate1',
+        'main.start.inter2.inter2_substate2',
     ]
