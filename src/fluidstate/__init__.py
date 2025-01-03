@@ -22,18 +22,12 @@
 
 import inspect
 import logging
-from itertools import chain, zip_longest
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    Iterable,
-    Iterator,
-    List,
-    Optional,
-    Tuple,
-    Union,
-)
+from collections import deque
+from itertools import zip_longest
+from typing import TYPE_CHECKING, Any, Optional, Union
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable, Iterator
 
 __author__ = 'Jesse P. Johnson'
 __author_email__ = 'jpj6652@gmail.com'
@@ -47,11 +41,11 @@ __all__ = ('StateChart', 'State', 'Transition')
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
-Content = Union[Callable, str]
+Content = Union['Callable', str]
 Condition = Union[Content, bool]
 
 
-def tuplize(value: Any) -> Tuple[Any, ...]:
+def tuplize(value: Any) -> tuple[Any, ...]:
     """Convert any type into a tuple."""
     return tuple(value) if type(value) in (list, tuple) else (value,)
 
@@ -64,7 +58,7 @@ class Action:
 
     @classmethod
     def create(
-        cls, settings: Union['Action', Callable, Dict[str, Any]]
+        cls, settings: Union['Action', 'Callable', dict[str, Any]]
     ) -> 'Action':
         """Create expression from configuration."""
         if isinstance(settings, cls):
@@ -89,7 +83,7 @@ class Action:
         )
 
     @staticmethod
-    def __run_with_args(content: Callable, *args: Any, **kwargs: Any) -> Any:
+    def __run_with_args(content: 'Callable', *args: Any, **kwargs: Any) -> Any:
         signature = inspect.signature(content)
         if len(signature.parameters.keys()) != 0:
             return content(*args, **kwargs)
@@ -104,7 +98,7 @@ class Guard:
 
     @classmethod
     def create(
-        cls, settings: Union['Guard', Callable, Dict[str, Any], bool]
+        cls, settings: Union['Guard', 'Callable', dict[str, Any], bool]
     ) -> 'Guard':
         """Create expression from configuration."""
         if isinstance(settings, cls):
@@ -142,13 +136,13 @@ class Transition:
         self,
         event: str,
         target: str,
-        action: Optional[Iterable['Action']] = None,
-        cond: Optional[Iterable['Guard']] = None,
+        action: Optional['Iterable[Action]'] = None,
+        cond: Optional['Iterable[Guard]'] = None,
     ) -> None:
         self.event = event
         self.target = target
-        self.action = action
-        self.cond = cond
+        self.action = action or []
+        self.cond = cond or []
 
     def __repr__(self) -> str:
         return repr(f"Transition(event={self.event}, target={self.target})")
@@ -175,7 +169,7 @@ class Transition:
             )
         raise InvalidConfig('could not find a valid transition configuration')
 
-    def callback(self) -> Callable:
+    def callback(self) -> 'Callable':
         """Provide callback capbility."""
 
         def event(machine: 'StateChart', *args: Any, **kwargs: Any) -> None:
@@ -212,16 +206,18 @@ class State:  # pylint: disable=too-many-instance-attributes
     """Represent state."""
 
     __initial: Optional['Content']
-    __on_entry: Optional[Iterable['Action']]
-    __on_exit: Optional[Iterable['Action']]
-    __stack: List['State']
+    __on_entry: Optional['Iterable[Action]']
+    __on_exit: Optional['Iterable[Action]']
+    __queue: deque['State']
     __superstate: Optional['State']
+    __substates: tuple['State', ...]
+    __transitions: tuple['Transition', ...]
 
     def __init__(
         self,
         name: str,
-        transitions: Optional[List['Transition']] = None,
-        states: Optional[List['State']] = None,
+        transitions: Optional[tuple['Transition']] = None,
+        states: Optional[tuple['State']] = None,
         **kwargs: Any,
     ) -> None:
         if not name.replace('_', '').isalnum():
@@ -230,16 +226,15 @@ class State:  # pylint: disable=too-many-instance-attributes
         self.__superstate: Optional['State'] = None
         self.__type = kwargs.get('type')
         self.__initial = kwargs.get('initial')
-        self.__substates = {}
-        for state in states or []:
+        self.__substates = states or ()
+        for state in self.substates:
             state.superstate = self
-            self.__substates[state.name] = state
-        self.__transitions = transitions or []
+        self.__transitions = transitions or ()
         for transition in self.transitions:
             self.__register_transition_callback(transition)
         # FIXME: pseudostates should not include triggers
-        self.__on_entry = kwargs.get('on_entry')
-        self.__on_exit = kwargs.get('on_exit')
+        self.__on_entry = kwargs.get('on_entry') or ()
+        self.__on_exit = kwargs.get('on_exit') or ()
         self.__validate_state()
 
     def __eq__(self, other: object) -> bool:
@@ -256,22 +251,19 @@ class State:  # pylint: disable=too-many-instance-attributes
         return f"State({self.name})"
 
     def __iter__(self) -> 'State':
-        self.__stack = [self]
+        self.__queue = deque([self])
         return self
 
     def __next__(self) -> 'State':
         # simple breadth-first iteration
-        if self.__stack:
-            x = self.__stack.pop()
+        if self.__queue:
+            x = self.__queue.pop()
             if isinstance(x, State):
-                self.__stack = list(
-                    # XXX: why is chain appending in reverse?!?
-                    chain(reversed(x.substates.values()), self.__stack)
-                )
+                self.__queue.extendleft(x.substates)
             return x
         raise StopIteration
 
-    def __reversed__(self) -> Iterator['State']:
+    def __reversed__(self) -> 'Iterator[State]':
         target: Optional['State'] = self
         while target:
             yield target
@@ -311,14 +303,14 @@ class State:  # pylint: disable=too-many-instance-attributes
                 initial=settings.get('initial'),
                 type=settings.get('type'),
                 states=(
-                    list(map(State.create, settings.pop('states')))
+                    tuple(map(State.create, settings.pop('states')))
                     if 'states' in settings
                     else None
                 ),
                 transitions=(
-                    list(map(Transition.create, settings['transitions']))
+                    tuple(map(Transition.create, settings['transitions']))
                     if 'transitions' in settings
-                    else []
+                    else None
                 ),
                 on_entry=(
                     tuple(map(Action.create, tuplize(settings['on_entry'])))
@@ -328,7 +320,7 @@ class State:  # pylint: disable=too-many-instance-attributes
                 on_exit=(
                     tuple(map(Action.create, tuplize(settings['on_exit'])))
                     if 'on_exit' in settings
-                    else []
+                    else None
                 ),
             )
         raise InvalidConfig('could not find a valid state configuration')
@@ -353,7 +345,7 @@ class State:  # pylint: disable=too-many-instance-attributes
         return '.'.join(reversed([x.name for x in reversed(self)]))
 
     @property
-    def substates(self) -> Dict[str, 'State']:
+    def substates(self) -> tuple['State', ...]:
         """Return substates."""
         return self.__substates
 
@@ -370,19 +362,19 @@ class State:  # pylint: disable=too-many-instance-attributes
             raise FluidstateException('cannot change superstate for state')
 
     @property
-    def transitions(self) -> Tuple['Transition', ...]:
+    def transitions(self) -> tuple['Transition', ...]:
         """Return transitions of this state."""
         return tuple(self.__transitions)
 
     def _run_on_entry(self, machine: 'StateChart') -> None:
-        for action in self.__on_entry or []:
+        for action in self.__on_entry:
             action.run(machine)
             log.info(
                 "executed 'on_entry' state change action for %s", self.name
             )
 
     def _run_on_exit(self, machine: 'StateChart') -> None:
-        for action in self.__on_exit or []:
+        for action in self.__on_exit:
             action.run(machine)
             log.info(
                 "executed 'on_exit' state change action for %s", self.name
@@ -397,8 +389,8 @@ class MetaStateChart(type):
     def __new__(
         mcs,
         name: str,
-        bases: Tuple[type, ...],
-        attrs: Dict[str, Any],
+        bases: tuple[type, ...],
+        attrs: dict[str, Any],
     ) -> 'MetaStateChart':
         settings = attrs.pop('__statechart__', None)
         obj = super().__new__(mcs, name, bases, attrs)
@@ -408,12 +400,12 @@ class MetaStateChart(type):
                 initial=settings.pop('initial', None),
                 type=settings.pop('type', None),
                 states=(
-                    list(map(State.create, settings.pop('states')))
+                    tuple(map(State.create, settings.pop('states')))
                     if 'states' in settings
                     else None
                 ),
                 transitions=(
-                    list(map(Transition.create, settings.pop('transitions')))
+                    tuple(map(Transition.create, settings.pop('transitions')))
                     if 'transitions' in settings
                     else None
                 ),
@@ -428,7 +420,7 @@ class StateChart(metaclass=MetaStateChart):
 
     def __init__(
         self,
-        initial: Optional[Union[Callable, str]] = None,
+        initial: Optional[Union['Callable', str]] = None,
         **kwargs: Any,
     ) -> None:
         if 'logging_enabled' in kwargs and kwargs['logging_enabled']:
@@ -494,12 +486,12 @@ class StateChart(metaclass=MetaStateChart):
         raise AttributeError(f"unable to find {name!r} attribute")
 
     @property
-    def active(self) -> Tuple['State', ...]:
+    def active(self) -> tuple['State', ...]:
         """Return active states."""
         return tuple(reversed(self.state))
 
     @property
-    def transitions(self) -> Iterator['Transition']:
+    def transitions(self) -> 'Iterator[Transition]':
         """Return list of current transitions."""
         for state in self.active:
             yield from state.transitions
@@ -510,9 +502,9 @@ class StateChart(metaclass=MetaStateChart):
         return self.state.superstate or self.main
 
     @property
-    def states(self) -> Tuple['State', ...]:
+    def states(self) -> tuple['State', ...]:
         """Return list of states."""
-        return tuple(self.superstate.substates.values())
+        return tuple(self.superstate.substates)
 
     @property
     def state(self) -> 'State':
@@ -552,7 +544,7 @@ class StateChart(metaclass=MetaStateChart):
 
         # general recursive search for single query
         if len(macrostep) == 1:
-            for x in list(state):
+            for x in tuple(state):
                 if x == macrostep[0]:
                     return x
         # set start point if using relative lookup
@@ -577,7 +569,7 @@ class StateChart(metaclass=MetaStateChart):
             if state == target:
                 return state
             # walk path if exists
-            if hasattr(state, 'states') and microstep in state.states.keys():
+            if hasattr(state, 'states') and microstep in state.states:
                 state = state.states[microstep]
                 # check if target is found
                 if not macrostep:
@@ -586,7 +578,7 @@ class StateChart(metaclass=MetaStateChart):
                 break
         raise InvalidState(f"state could not be found: {statepath}")
 
-    def get_transitions(self, event: str) -> Tuple['Transition', ...]:
+    def get_transitions(self, event: str) -> tuple['Transition', ...]:
         """Get each transition maching event."""
         return tuple(
             filter(
@@ -610,9 +602,9 @@ class StateChart(metaclass=MetaStateChart):
                         self.__state = self.active[1]
                     elif (
                         isinstance(self.state, State)
-                        and microstep in self.state.substates.keys()
+                        and microstep in self.state.substates
                     ):  # forward
-                        state = self.state.substates[microstep]
+                        state = self.get_state(microstep)
                         self.__state = state
                         state._run_on_entry(self)
                     else:
