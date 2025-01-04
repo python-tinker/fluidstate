@@ -56,11 +56,28 @@ class Action:
     def __init__(self, content: 'Content') -> None:
         self.content = content
 
+    def __call__(
+        self,
+        machine: 'StateChart',
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
+        """Run action."""
+        if callable(self.content):
+            content = self.content
+            args = (machine, *args)
+        else:
+            content = getattr(machine, self.content)
+        signature = inspect.signature(content)
+        if len(signature.parameters.keys()) != 0:
+            return content(*args, **kwargs)
+        return content()
+
     @classmethod
     def create(
         cls, settings: Union['Action', 'Callable', dict[str, Any]]
     ) -> 'Action':
-        """Create expression from configuration."""
+        """Create action from configuration settings."""
         if isinstance(settings, cls):
             return settings
         if callable(settings) or isinstance(settings, str):
@@ -69,26 +86,6 @@ class Action:
             return cls(**settings)
         raise InvalidConfig('could not find a valid configuration for action')
 
-    def run(
-        self,
-        machine: 'StateChart',
-        *args: Any,
-        **kwargs: Any,
-    ) -> Any:
-        """Run the action."""
-        if callable(self.content):
-            return self.__run_with_args(self.content, machine, *args, **kwargs)
-        return self.__run_with_args(
-            getattr(machine, self.content), *args, **kwargs
-        )
-
-    @staticmethod
-    def __run_with_args(content: 'Callable', *args: Any, **kwargs: Any) -> Any:
-        signature = inspect.signature(content)
-        if len(signature.parameters.keys()) != 0:
-            return content(*args, **kwargs)
-        return content()
-
 
 class Guard:
     """Control the flow of transitions to states with conditions."""
@@ -96,25 +93,10 @@ class Guard:
     def __init__(self, condition: 'Condition') -> None:
         self.condition = condition
 
-    @classmethod
-    def create(
-        cls, settings: Union['Guard', 'Callable', dict[str, Any], bool]
-    ) -> 'Guard':
-        """Create expression from configuration."""
-        if isinstance(settings, cls):
-            return settings
-        if callable(settings) or isinstance(settings, str):
-            return cls(settings)
-        if isinstance(settings, dict):
-            return cls(**settings)
-        if isinstance(settings, bool):
-            return cls(condition=settings)
-        raise InvalidConfig('could not find a valid configuration for guard')
-
-    def evaluate(
+    def __call__(
         self, machine: 'StateChart', *args: Any, **kwargs: Any
     ) -> bool:
-        """Evaluate conditions."""
+        """Evaluate condition."""
         if callable(self.condition):
             return self.condition(machine, *args, **kwargs)
         if isinstance(self.condition, str):
@@ -127,6 +109,21 @@ class Guard:
         if isinstance(self.condition, bool):
             return self.condition
         return False
+
+    @classmethod
+    def create(
+        cls, settings: Union['Guard', 'Callable', dict[str, Any], bool]
+    ) -> 'Guard':
+        """Create guard from configuration settings."""
+        if isinstance(settings, cls):
+            return settings
+        if callable(settings) or isinstance(settings, str):
+            return cls(settings)
+        if isinstance(settings, dict):
+            return cls(**settings)
+        if isinstance(settings, bool):
+            return cls(condition=settings)
+        raise InvalidConfig('could not find a valid configuration for guard')
 
 
 class Transition:
@@ -159,12 +156,12 @@ class Transition:
                 action=(
                     tuple(map(Action.create, tuplize(settings['action'])))
                     if 'action' in settings
-                    else []
+                    else None
                 ),
                 cond=(
                     tuple(map(Guard.create, tuplize(settings['cond'])))
                     if 'cond' in settings
-                    else []
+                    else None
                 ),
             )
         raise InvalidConfig('could not find a valid transition configuration')
@@ -186,7 +183,7 @@ class Transition:
         result = True
         if self.cond:
             for cond in self.cond:
-                result = cond.evaluate(machine, *args, **kwargs)
+                result = cond(machine, *args, **kwargs)
                 if not result:
                     break
         return result
@@ -196,7 +193,7 @@ class Transition:
         machine._change_state(self.target)
         if self.action:
             for action in self.action:
-                action.run(machine, *args, **kwargs)
+                action(machine, *args, **kwargs)
             log.info("executed action event for %r", self.event)
         else:
             log.info("no action event for %r", self.event)
@@ -368,14 +365,14 @@ class State:  # pylint: disable=too-many-instance-attributes
 
     def _run_on_entry(self, machine: 'StateChart') -> None:
         for action in self.__on_entry:
-            action.run(machine)
+            action(machine)
             log.info(
                 "executed 'on_entry' state change action for %s", self.name
             )
 
     def _run_on_exit(self, machine: 'StateChart') -> None:
         for action in self.__on_exit:
-            action.run(machine)
+            action(machine)
             log.info(
                 "executed 'on_exit' state change action for %s", self.name
             )
