@@ -20,6 +20,8 @@
 
 """Compact statechart that can be vendored."""
 
+from __future__ import annotations
+
 import inspect
 import logging
 from collections import deque
@@ -53,12 +55,12 @@ def tuplize(value: Any) -> tuple[Any, ...]:
 class Action:
     """Encapsulate executable content."""
 
-    def __init__(self, content: 'Content') -> None:
+    def __init__(self, content: Content) -> None:
         self.content = content
 
     def __call__(
         self,
-        machine: 'StateChart',
+        machine: StateChart,
         *args: Any,
         **kwargs: Any,
     ) -> Any:
@@ -75,7 +77,7 @@ class Action:
 
     @classmethod
     def create(
-        cls, settings: Union['Action', 'Callable', dict[str, Any]]
+        cls, settings: Union[Action, 'Callable', dict[str, Any]]
     ) -> 'Action':
         """Create action from configuration settings."""
         if isinstance(settings, cls):
@@ -90,11 +92,11 @@ class Action:
 class Guard:
     """Control the flow of transitions to states with conditions."""
 
-    def __init__(self, condition: 'Condition') -> None:
+    def __init__(self, condition: Condition) -> None:
         self.condition = condition
 
     def __call__(
-        self, machine: 'StateChart', *args: Any, **kwargs: Any
+        self, machine: StateChart, *args: Any, **kwargs: Any
     ) -> bool:
         """Evaluate condition."""
         if callable(self.condition):
@@ -112,8 +114,8 @@ class Guard:
 
     @classmethod
     def create(
-        cls, settings: Union['Guard', 'Callable', dict[str, Any], bool]
-    ) -> 'Guard':
+        cls, settings: Union[Guard, 'Callable', dict[str, Any], bool]
+    ) -> Guard:
         """Create guard from configuration settings."""
         if isinstance(settings, cls):
             return settings
@@ -145,7 +147,7 @@ class Transition:
         return repr(f"Transition(event={self.event}, target={self.target})")
 
     @classmethod
-    def create(cls, settings: Union['Transition', dict]) -> 'Transition':
+    def create(cls, settings: Union[Transition, dict]) -> Transition:
         """Consolidate."""
         if isinstance(settings, cls):
             return settings
@@ -169,7 +171,7 @@ class Transition:
     def callback(self) -> 'Callable':
         """Provide callback capbility."""
 
-        def event(machine: 'StateChart', *args: Any, **kwargs: Any) -> None:
+        def event(machine: StateChart, *args: Any, **kwargs: Any) -> None:
             machine._process_event(self.event, *args, **kwargs)
 
         event.__name__ = self.event
@@ -177,7 +179,7 @@ class Transition:
         return event
 
     def evaluate(
-        self, machine: 'StateChart', *args: Any, **kwargs: Any
+        self, machine: StateChart, *args: Any, **kwargs: Any
     ) -> bool:
         """Evaluate guard conditions to determine correct transition."""
         result = True
@@ -188,7 +190,7 @@ class Transition:
                     break
         return result
 
-    def run(self, machine: 'StateChart', *args: Any, **kwargs: Any) -> None:
+    def run(self, machine: StateChart, *args: Any, **kwargs: Any) -> None:
         """Execute actions of the transition."""
         machine._change_state(self.target)
         if self.action:
@@ -202,25 +204,25 @@ class Transition:
 class State:  # pylint: disable=too-many-instance-attributes
     """Represent state."""
 
-    __initial: Optional['Content']
+    __initial: Optional[Content]
     __on_entry: Optional['Iterable[Action]']
     __on_exit: Optional['Iterable[Action]']
-    __queue: deque['State']
-    __superstate: Optional['State']
-    __substates: tuple['State', ...]
-    __transitions: tuple['Transition', ...]
+    __queue: deque[State]
+    __superstate: Optional[State]
+    __substates: tuple[State, ...]
+    __transitions: tuple[Transition, ...]
 
     def __init__(
         self,
         name: str,
-        transitions: Optional[tuple['Transition']] = None,
-        states: Optional[tuple['State']] = None,
+        transitions: Optional[tuple[Transition]] = None,
+        states: Optional[tuple[State]] = None,
         **kwargs: Any,
     ) -> None:
         if not name.replace('_', '').isalnum():
             raise InvalidConfig('state name contains invalid characters')
         self.name = name
-        self.__superstate: Optional['State'] = None
+        self.__superstate: Optional[State] = None
         self.__type = kwargs.get('type')
         self.__initial = kwargs.get('initial')
         self.__substates = states or ()
@@ -247,11 +249,11 @@ class State:  # pylint: disable=too-many-instance-attributes
     def __str__(self) -> str:
         return f"State({self.name})"
 
-    def __iter__(self) -> 'State':
+    def __iter__(self) -> State:
         self.__queue = deque([self])
         return self
 
-    def __next__(self) -> 'State':
+    def __next__(self) -> State:
         # simple breadth-first iteration
         if self.__queue:
             x = self.__queue.pop()
@@ -261,12 +263,12 @@ class State:  # pylint: disable=too-many-instance-attributes
         raise StopIteration
 
     def __reversed__(self) -> 'Iterator[State]':
-        target: Optional['State'] = self
+        target: Optional[State] = self
         while target:
             yield target
             target = target.superstate
 
-    def __register_transition_callback(self, t: 'Transition') -> None:
+    def __register_transition_callback(self, t: Transition) -> None:
         # XXX: currently mapping to class instead of instance
         # TODO: need way to provide auto-transition
         setattr(
@@ -288,7 +290,7 @@ class State:  # pylint: disable=too-many-instance-attributes
         log.info('evaluated state')
 
     @classmethod
-    def create(cls, settings: Union['State', dict, str]) -> 'State':
+    def create(cls, settings: Union[State, dict, str]) -> State:
         """Consolidate."""
         if isinstance(settings, cls):
             return settings
@@ -323,7 +325,7 @@ class State:  # pylint: disable=too-many-instance-attributes
         raise InvalidConfig('could not find a valid state configuration')
 
     @property
-    def initial(self) -> Optional['Content']:
+    def initial(self) -> Optional[Content]:
         """Return initial substate if defined."""
         return self.__initial
 
@@ -342,35 +344,35 @@ class State:  # pylint: disable=too-many-instance-attributes
         return '.'.join(reversed([x.name for x in reversed(self)]))
 
     @property
-    def substates(self) -> tuple['State', ...]:
+    def substates(self) -> tuple[State, ...]:
         """Return substates."""
         return self.__substates
 
     @property
-    def superstate(self) -> Optional['State']:
+    def superstate(self) -> Optional[State]:
         """Get superstate state."""
         return self.__superstate
 
     @superstate.setter
-    def superstate(self, state: 'State') -> None:
+    def superstate(self, state: State) -> None:
         if self.__superstate is None:
             self.__superstate = state
         else:
             raise FluidstateException('cannot change superstate for state')
 
     @property
-    def transitions(self) -> tuple['Transition', ...]:
+    def transitions(self) -> tuple[Transition, ...]:
         """Return transitions of this state."""
         return tuple(self.__transitions)
 
-    def _run_on_entry(self, machine: 'StateChart') -> None:
+    def _run_on_entry(self, machine: StateChart) -> None:
         for action in self.__on_entry:
             action(machine)
             log.info(
                 "executed 'on_entry' state change action for %s", self.name
             )
 
-    def _run_on_exit(self, machine: 'StateChart') -> None:
+    def _run_on_exit(self, machine: StateChart) -> None:
         for action in self.__on_exit:
             action(machine)
             log.info(
@@ -381,7 +383,7 @@ class State:  # pylint: disable=too-many-instance-attributes
 class MetaStateChart(type):
     """Provide capability to populate configuration for statemachine ."""
 
-    main: 'State'
+    main: State
 
     def __new__(
         mcs,
@@ -413,7 +415,7 @@ class MetaStateChart(type):
 class StateChart(metaclass=MetaStateChart):
     """Provide state management capability."""
 
-    __initial: 'State'
+    __initial: State
 
     def __init__(
         self,
@@ -483,7 +485,7 @@ class StateChart(metaclass=MetaStateChart):
         raise AttributeError(f"unable to find {name!r} attribute")
 
     @property
-    def active(self) -> tuple['State', ...]:
+    def active(self) -> tuple[State, ...]:
         """Return active states."""
         return tuple(reversed(self.state))
 
@@ -494,17 +496,17 @@ class StateChart(metaclass=MetaStateChart):
             yield from state.transitions
 
     @property
-    def superstate(self) -> 'State':
+    def superstate(self) -> State:
         """Return superstate."""
         return self.state.superstate or self.main
 
     @property
-    def states(self) -> tuple['State', ...]:
+    def states(self) -> tuple[State, ...]:
         """Return list of states."""
         return tuple(self.superstate.substates)
 
     @property
-    def state(self) -> 'State':
+    def state(self) -> State:
         """Return the current state."""
         return self.__state
 
@@ -534,9 +536,9 @@ class StateChart(metaclass=MetaStateChart):
             relpath = '.'.join(path)
         return relpath
 
-    def get_state(self, statepath: str) -> 'State':
+    def get_state(self, statepath: str) -> State:
         """Get state."""
-        state: 'State' = self.main
+        state: State = self.main
         macrostep = statepath.split('.')
 
         # general recursive search for single query
@@ -575,7 +577,7 @@ class StateChart(metaclass=MetaStateChart):
                 break
         raise InvalidState(f"state could not be found: {statepath}")
 
-    def get_transitions(self, event: str) -> tuple['Transition', ...]:
+    def get_transitions(self, event: str) -> tuple[Transition, ...]:
         """Get each transition maching event."""
         return tuple(
             filter(
