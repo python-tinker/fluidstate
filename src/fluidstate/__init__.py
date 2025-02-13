@@ -25,11 +25,9 @@ from __future__ import annotations
 import inspect
 import logging
 from collections import deque
+from collections.abc import Callable, Iterable, Iterator
 from itertools import zip_longest
-from typing import TYPE_CHECKING, Any, Optional, Union
-
-if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable, Iterator
+from typing import Any, Optional, Union
 
 __author__ = 'Jesse P. Johnson'
 __author_email__ = 'jpj6652@gmail.com'
@@ -43,7 +41,7 @@ __all__ = ('StateChart', 'State', 'Transition')
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
-Content = Union['Callable', str]
+Content = Union[Callable, str]
 Condition = Union[Content, bool]
 
 
@@ -70,14 +68,16 @@ class Action:
             args = (machine, *args)
         else:
             content = getattr(machine, self.content)
-        signature = inspect.signature(content)
-        if len(signature.parameters.keys()) != 0:
+        parameters = inspect.signature(content).parameters
+        if len(parameters.keys()) != 0:
+            if kwargs and 'kwargs' not in parameters:
+                kwargs = {k: v for k, v in kwargs.items() if k in parameters}
             return content(*args, **kwargs)
         return content()
 
     @classmethod
     def create(
-        cls, settings: Union[Action, 'Callable', dict[str, Any]]
+        cls, settings: Union[Action, Callable, dict[str, Any]]
     ) -> 'Action':
         """Create action from configuration settings."""
         if isinstance(settings, cls):
@@ -95,16 +95,19 @@ class Guard:
     def __init__(self, condition: Condition) -> None:
         self.condition = condition
 
-    def __call__(
-        self, machine: StateChart, *args: Any, **kwargs: Any
-    ) -> bool:
+    def __call__(self, machine: StateChart, *args: Any, **kwargs: Any) -> bool:
         """Evaluate condition."""
         if callable(self.condition):
             return self.condition(machine, *args, **kwargs)
         if isinstance(self.condition, str):
             cond = getattr(machine, self.condition)
             if callable(cond):
-                if len(dict((inspect.signature(cond)).parameters).keys()) != 0:
+                parameters = inspect.signature(cond).parameters
+                if len(parameters.keys()) != 0:
+                    if kwargs and 'kwargs' not in parameters:
+                        kwargs = {
+                            k: v for k, v in kwargs.items() if k in parameters
+                        }
                     return cond(*args, **kwargs)
                 return cond()
             return bool(cond)
@@ -114,7 +117,7 @@ class Guard:
 
     @classmethod
     def create(
-        cls, settings: Union[Guard, 'Callable', dict[str, Any], bool]
+        cls, settings: Union[Guard, Callable, dict[str, Any], bool]
     ) -> Guard:
         """Create guard from configuration settings."""
         if isinstance(settings, cls):
@@ -135,8 +138,8 @@ class Transition:
         self,
         event: str,
         target: str,
-        action: Optional['Iterable[Action]'] = None,
-        cond: Optional['Iterable[Guard]'] = None,
+        action: Optional[Iterable[Action]] = None,
+        cond: Optional[Iterable[Guard]] = None,
     ) -> None:
         self.event = event
         self.target = target
@@ -168,7 +171,7 @@ class Transition:
             )
         raise InvalidConfig('could not find a valid transition configuration')
 
-    def callback(self) -> 'Callable':
+    def callback(self) -> Callable:
         """Provide callback capbility."""
 
         def event(machine: StateChart, *args: Any, **kwargs: Any) -> None:
@@ -178,9 +181,7 @@ class Transition:
         event.__doc__ = f"Show event: '{self.event}'."
         return event
 
-    def evaluate(
-        self, machine: StateChart, *args: Any, **kwargs: Any
-    ) -> bool:
+    def evaluate(self, machine: StateChart, *args: Any, **kwargs: Any) -> bool:
         """Evaluate guard conditions to determine correct transition."""
         result = True
         if self.cond:
@@ -205,8 +206,8 @@ class State:  # pylint: disable=too-many-instance-attributes
     """Represent state."""
 
     __initial: Optional[Content]
-    __on_entry: Optional['Iterable[Action]']
-    __on_exit: Optional['Iterable[Action]']
+    __on_entry: Optional[Iterable[Action]]
+    __on_exit: Optional[Iterable[Action]]
     __queue: deque[State]
     __superstate: Optional[State]
     __substates: tuple[State, ...]
@@ -262,7 +263,7 @@ class State:  # pylint: disable=too-many-instance-attributes
             return x
         raise StopIteration
 
-    def __reversed__(self) -> 'Iterator[State]':
+    def __reversed__(self) -> Iterator[State]:
         target: Optional[State] = self
         while target:
             yield target
@@ -390,7 +391,7 @@ class MetaStateChart(type):
         name: str,
         bases: tuple[type, ...],
         attrs: dict[str, Any],
-    ) -> 'MetaStateChart':
+    ) -> MetaStateChart:
         settings = attrs.pop('__statechart__', None)
         obj = super().__new__(mcs, name, bases, attrs)
         if settings:
@@ -419,7 +420,7 @@ class StateChart(metaclass=MetaStateChart):
 
     def __init__(
         self,
-        initial: Optional[Union['Callable', str]] = None,
+        initial: Optional[Union[Callable, str]] = None,
         **kwargs: Any,
     ) -> None:
         if 'logging_enabled' in kwargs and kwargs['logging_enabled']:
@@ -490,7 +491,7 @@ class StateChart(metaclass=MetaStateChart):
         return tuple(reversed(self.state))
 
     @property
-    def transitions(self) -> 'Iterator[Transition]':
+    def transitions(self) -> Iterator[Transition]:
         """Return list of current transitions."""
         for state in self.active:
             yield from state.transitions
@@ -550,8 +551,7 @@ class StateChart(metaclass=MetaStateChart):
         elif statepath.startswith('.'):
             relative = len(statepath) - len(statepath.lstrip('.')) - 1
             state = self.active[relative:][0]
-            rel = relative + 1
-            macrostep = [state.name] + macrostep[rel:]
+            macrostep = [state.name] + macrostep[relative + 1 :]
 
         # check relative lookup is done
         target = macrostep[-1]
