@@ -49,16 +49,10 @@ class StopLight(StateChart):
     }
 
 
-async def main(stoplight):
-    async for x in stoplight.state:
-        print(x)
-
-
 if __name__ == '__main__':
     import asyncio
     stoplight = StopLight()
-    asyncio.run(main(stoplight))
-    # for x in range(3):
-    #     stoplight.turn_green()
-    #     stoplight.turn_yellow()
-    #     stoplight.turn_red()
+    for x in range(3):
+        stoplight.turn_green()
+        stoplight.turn_yellow()
+        stoplight.turn_red()

@@ -22,6 +22,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import inspect
 import logging
 from collections import deque
@@ -36,7 +37,7 @@ __description__ = 'Compact statechart that can be vendored.'
 __version__ = '1.3.1a0'
 __license__ = 'MIT'
 __copyright__ = 'Copyright 2022 Jesse Johnson.'
-__all__ = ('StateChart', 'State', 'Transition')
+__all__ = ('Action', 'Guard', 'State', 'StateChart', 'Transition')
 
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
@@ -230,8 +231,6 @@ class State:  # pylint: disable=too-many-instance-attributes
         for state in self.substates:
             state.superstate = self
         self.__transitions = transitions or ()
-        for transition in self.transitions:
-            self.__register_transition_callback(transition)
         # FIXME: pseudostates should not include triggers
         self.__on_entry = kwargs.get('on_entry') or ()
         self.__on_exit = kwargs.get('on_exit') or ()
@@ -268,16 +267,6 @@ class State:  # pylint: disable=too-many-instance-attributes
         while target:
             yield target
             target = target.superstate
-
-    def __register_transition_callback(self, t: Transition) -> None:
-        # XXX: currently mapping to class instead of instance
-        # TODO: need way to provide auto-transition
-        setattr(
-            self,
-            t.event if t.event != '' else '_auto_',
-            # pylint: disable-next=unnecessary-dunder-call
-            t.callback().__get__(self, self.__class__),
-        )
 
     def __validate_state(self) -> None:
         # TODO: empty statemachine should default to null event
@@ -466,14 +455,6 @@ class StateChart(metaclass=MetaStateChart):
         # handle state check for active states
         if name.startswith('is_'):
             return name[3:] in self.active
-
-        # handle automatic transitions
-        # if name == '_auto_':
-
-        #     def wrapper(*args: Any, **kwargs: Any) -> Optional[Any]:
-        #         return self.trigger('', *args, **kwargs)
-
-        #     return wrapper
 
         # handle transition as function by event name
         if self.state.type != 'final':
