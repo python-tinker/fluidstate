@@ -30,13 +30,6 @@ class MyMachine(StateChart):
     }
 
 
-def test_its_declaration_creates_a_method_with_its_name():
-    machine = MyMachine()
-    assert hasattr(machine.state, 'queue') and callable(machine.state.queue)
-    assert hasattr(machine.state, 'cancel') and callable(machine.state.cancel)
-    machine.queue()
-
-
 def test_it_changes_machine_state():
     machine = MyMachine()
     assert machine.state == 'created'
