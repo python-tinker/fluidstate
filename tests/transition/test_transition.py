@@ -1,7 +1,7 @@
 import pytest
 
 from fluidstate import (
-    # InvalidTransition,
+    InvalidTransition,
     StateChart
 )
 
@@ -33,9 +33,9 @@ class MyMachine(StateChart):
 def test_it_changes_machine_state():
     machine = MyMachine()
     assert machine.state == 'created'
-    machine.queue()
+    machine.trigger('queue')
     assert machine.state == 'waiting'
-    machine.process()
+    machine.trigger('process')
     assert machine.state == 'processed'
 
 
@@ -43,39 +43,39 @@ def test_it_changes_machine_state():
 def test_it_ensures_event_order():
     machine = MyMachine()
     assert machine.state == 'created'
-    with pytest.raises(AttributeError):
-        machine.process()
+    with pytest.raises(InvalidTransition):
+        machine.trigger('process')
 
     # with pytest.raises(InvalidTransition):
 
-    machine.queue()
+    machine.trigger('queue')
     assert machine.state == 'waiting'
     # waiting does not have queue transition
-    with pytest.raises(AttributeError):
-        machine.queue()
+    with pytest.raises(InvalidTransition):
+        machine.trigger('queue')
 
     # with pytest.raises(InvalidTransition):
 
-    machine.process()
+    machine.trigger('process')
     assert machine.state == 'processed'
     # cannot cancel after processed
     with pytest.raises(Exception):
-        machine.cancel()
+        machine.trigger('cancel')
 
 
 def test_it_accepts_multiple_origin_states():
     machine = MyMachine(initial='processed')
     assert machine.state == 'processed'
     with pytest.raises(Exception):
-        machine.cancel()
+        machine.trigger('cancel')
 
     machine = MyMachine(initial='cancelled')
     assert machine.state == 'cancelled'
     with pytest.raises(Exception):
-        machine.queue()
+        machine.trigger('queue')
 
     machine = MyMachine(initial='waiting')
-    machine.process()
+    machine.trigger('process')
     assert machine.state == 'processed'
     with pytest.raises(Exception):
-        machine.cancel()
+        machine.trigger('cancel')

@@ -35,7 +35,7 @@ def test_it_runs_when_transition_occurs():
     guy = CrazyGuy()
     assert guy.at_risk is False
 
-    guy.jump()
+    guy.trigger('jump')
     assert guy.at_risk is True
 
 
@@ -44,6 +44,6 @@ def test_it_supports_multiple_transition_actions():
     assert guy.at_risk is False
     assert guy.accelerating is False
 
-    guy.jump()
+    guy.trigger('jump')
     assert guy.at_risk is True
     assert guy.accelerating is True

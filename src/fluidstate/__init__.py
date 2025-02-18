@@ -22,7 +22,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import inspect
 import logging
 from collections import deque
@@ -172,16 +171,6 @@ class Transition:
             )
         raise InvalidConfig('could not find a valid transition configuration')
 
-    def callback(self) -> Callable:
-        """Provide callback capbility."""
-
-        def event(machine: StateChart, *args: Any, **kwargs: Any) -> None:
-            machine._process_event(self.event, *args, **kwargs)
-
-        event.__name__ = self.event
-        event.__doc__ = f"Show event: '{self.event}'."
-        return event
-
     def evaluate(self, machine: StateChart, *args: Any, **kwargs: Any) -> bool:
         """Evaluate guard conditions to determine correct transition."""
         result = True
@@ -192,15 +181,46 @@ class Transition:
                     break
         return result
 
-    def run(self, machine: StateChart, *args: Any, **kwargs: Any) -> None:
+    def execute(self, machine: StateChart, *args: Any, **kwargs: Any) -> None:
         """Execute actions of the transition."""
-        machine._change_state(self.target)
         if self.action:
             for action in self.action:
                 action(machine, *args, **kwargs)
             log.info("executed action event for %r", self.event)
         else:
             log.info("no action event for %r", self.event)
+
+    def run(self, machine: StateChart, *args: Any, **kwargs: Any) -> None:
+        """Transition the state of the statechart."""
+        relpath = machine.get_relpath(self.target)
+        if relpath == '.':  # handle self transition
+            machine.state._run_on_exit(machine)
+            self.execute(machine, *args, **kwargs)
+            machine.state._run_on_entry(machine)
+        else:
+            macrostep = relpath.split('.')[2 if relpath.endswith('.') else 1 :]
+            while macrostep[0] == '':  # reverse
+                machine.state._run_on_exit(machine)
+                machine.state = machine.active[1]
+                macrostep.pop(0)
+            self.execute(machine, *args, **kwargs)
+            for microstep in macrostep:  # forward
+                try:
+                    if (
+                        isinstance(machine.state, State)
+                        and microstep in machine.state.substates
+                    ):
+                        state = machine.get_state(microstep)
+                        machine.state = state
+                        state._run_on_entry(machine)
+                    else:
+                        raise InvalidState(
+                            f"statepath not found: {self.target}"
+                        )
+                except FluidstateException as err:
+                    log.error(err)
+                    raise KeyError('superstate is undefined') from err
+        log.info('changed state to %s', self.target)
 
 
 class State:  # pylint: disable=too-many-instance-attributes
@@ -361,6 +381,10 @@ class State:  # pylint: disable=too-many-instance-attributes
             log.info(
                 "executed 'on_entry' state change action for %s", self.name
             )
+        for transition in self.transitions:
+            if transition.event == '':
+                machine.trigger(transition.event)
+                break
 
     def _run_on_exit(self, machine: StateChart) -> None:
         for action in self.__on_exit:
@@ -443,8 +467,8 @@ class StateChart(metaclass=MetaStateChart):
         log.info('loaded states and transitions')
 
         if kwargs.get('enable_start_transition', True):
-            self.__state._run_on_entry(self)
-            self.__process_transient_state()
+            self.state._run_on_entry(self)
+            # self.__process_eventless_transition()
         log.info('statemachine initialization complete')
 
     def __getattr__(self, name: str) -> Any:
@@ -456,14 +480,6 @@ class StateChart(metaclass=MetaStateChart):
         if name.startswith('is_'):
             return name[3:] in self.active
 
-        # handle transition as function by event name
-        if self.state.type != 'final':
-            for t in self.transitions:
-                if t.event == name or (t.event == '' and name == '_auto_'):
-                    # pylint: disable-next=unnecessary-dunder-call
-                    return t.callback().__get__(self, self.__class__)
-        else:
-            raise InvalidTransition('cannot transition from final state')
         raise AttributeError(f"unable to find {name!r} attribute")
 
     @property
@@ -489,8 +505,19 @@ class StateChart(metaclass=MetaStateChart):
 
     @property
     def state(self) -> State:
-        """Return the current state."""
+        """Get the current state."""
         return self.__state
+
+    @state.setter
+    def state(self, state: State) -> None:
+        """Set the current state."""
+        if (
+            state in self.state.substates
+            or (len(self.active) > 1 and self.active[1] == state)
+        ):
+            self.__state = state
+        else:
+            raise InvalidTransition('cannot transition from final state')
 
     def get_relpath(self, target: str) -> str:
         """Get relative statepath of target state to current state."""
@@ -566,55 +593,11 @@ class StateChart(metaclass=MetaStateChart):
             )
         )
 
-    def _change_state(self, statepath: str) -> None:
-        """Traverse statepath."""
-        relpath = self.get_relpath(statepath)
-        if relpath == '.':  # handle self transition
-            self.state._run_on_exit(self)
-            self.state._run_on_entry(self)
-        else:
-            s = 2 if relpath.endswith('.') else 1  # stupid black
-            macrostep = relpath.split('.')[s:]
-            for microstep in macrostep:
-                try:
-                    if microstep == '':  # reverse
-                        self.state._run_on_exit(self)
-                        self.__state = self.active[1]
-                    elif (
-                        isinstance(self.state, State)
-                        and microstep in self.state.substates
-                    ):  # forward
-                        state = self.get_state(microstep)
-                        self.__state = state
-                        state._run_on_entry(self)
-                    else:
-                        raise InvalidState(f"statepath not found: {statepath}")
-                except FluidstateException as err:
-                    log.error(err)
-                    raise KeyError('superstate is undefined') from err
-        log.info('changed state to %s', statepath)
-
-    def trigger(
-        self, event: str, /, statepath: Optional[str] = None
-    ) -> Optional[Any]:
-        """Transition from one state to another."""
+    def trigger(self, event: str, *args: Any, **kwargs: Any) -> None:
+        # TODO: need to consider superstate transitions.
         if self.state.type == 'final':
             raise InvalidTransition('cannot transition from final state')
-        s = self.get_state(statepath) if statepath else self.state
-        for t in s.transitions:
-            if t.event == event:
-                # pylint: disable-next=unnecessary-dunder-call
-                return t.callback().__get__(self, self.__class__)
-        return None
 
-    def __process_transient_state(self) -> None:
-        for x in self.state.transitions:
-            if x.event == '':
-                self._auto_()
-                break
-
-    def _process_event(self, event: str, *args: Any, **kwargs: Any) -> None:
-        # TODO: need to consider superstate transitions.
         transitions = self.get_transitions(event)
         if not transitions:
             raise InvalidTransition('no transitions match event')
