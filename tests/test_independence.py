@@ -37,7 +37,7 @@ def test_two_machines_dont_share_transitions():
     assert machine_a.state == 'off'
     assert machine_b.state == 'off'
 
-    machine_a.toggle()
+    machine_a.trigger('toggle')
 
     assert machine_a.state == 'on'
     assert machine_b.state == 'off'
@@ -50,7 +50,7 @@ def test_two_machines_dont_share_actions():
     assert machine_a.on_count == 0
     assert machine_b.on_count == 0
 
-    machine_a.toggle()
+    machine_a.trigger('toggle')
 
     assert machine_a.on_count == 1
     assert machine_b.on_count == 0

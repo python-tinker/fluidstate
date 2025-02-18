@@ -52,7 +52,7 @@ class JumperGuy(StateChart):
 def test_every_callback_is_callable():
     """every callback can be a callable"""
     guy = JumperGuy()
-    guy.jump()
+    guy.trigger('jump')
     assert len(footsteps) == 5
     assert sorted(footsteps) == sorted(
         [
@@ -90,4 +90,4 @@ def test_deny_state_change_if_guard_callable_returns_false():
     door = Door()
     door.locked = True
     with pytest.raises(GuardNotSatisfied):
-        door.open()
+        door.trigger('open')

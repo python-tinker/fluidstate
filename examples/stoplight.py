@@ -53,6 +53,6 @@ if __name__ == '__main__':
     import asyncio
     stoplight = StopLight()
     for x in range(3):
-        stoplight.turn_green()
-        stoplight.turn_yellow()
-        stoplight.turn_red()
+        stoplight.trigger('turn_green')
+        stoplight.trigger('turn_yellow')
+        stoplight.trigger('turn_red')
