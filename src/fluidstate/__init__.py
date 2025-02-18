@@ -252,8 +252,8 @@ class State:  # pylint: disable=too-many-instance-attributes
             state.superstate = self
         self.__transitions = transitions or ()
         # FIXME: pseudostates should not include triggers
-        self.__on_entry = kwargs.get('on_entry') or ()
-        self.__on_exit = kwargs.get('on_exit') or ()
+        self.__on_entry = kwargs.get('on_entry')
+        self.__on_exit = kwargs.get('on_exit')
         self.__validate_state()
 
     def __eq__(self, other: object) -> bool:
@@ -373,10 +373,10 @@ class State:  # pylint: disable=too-many-instance-attributes
     @property
     def transitions(self) -> tuple[Transition, ...]:
         """Return transitions of this state."""
-        return tuple(self.__transitions)
+        return self.__transitions
 
     def _run_on_entry(self, machine: StateChart) -> None:
-        for action in self.__on_entry:
+        for action in self.__on_entry or ():
             action(machine)
             log.info(
                 "executed 'on_entry' state change action for %s", self.name
@@ -387,7 +387,7 @@ class State:  # pylint: disable=too-many-instance-attributes
                 break
 
     def _run_on_exit(self, machine: StateChart) -> None:
-        for action in self.__on_exit:
+        for action in self.__on_exit or ():
             action(machine)
             log.info(
                 "executed 'on_exit' state change action for %s", self.name
@@ -501,7 +501,7 @@ class StateChart(metaclass=MetaStateChart):
     @property
     def states(self) -> tuple[State, ...]:
         """Return list of states."""
-        return tuple(self.superstate.substates)
+        return self.superstate.substates
 
     @property
     def state(self) -> State:
